@@ -153,13 +153,6 @@ def collect_single_trajectory(agent, eval_envs, trajectory_length, device, seed)
             # Take step in environment
             if not info['is_tcp_near_obj'][0]:
                 action[..., -1] = 1
-            # Only for shoe on rack
-            # if episode_success > 0:
-            #     action[..., :-1] = 0
-            #     if episode_success < 7:
-            #         action[..., 0] = 1
-            #     if episode_success > 5:
-            #         action[..., 2] = -0.3
                 
             eval_obs, reward, terminated, truncated, info = eval_envs.step(action)
             # Only for letter arrange
