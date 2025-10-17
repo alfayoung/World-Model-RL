@@ -37,12 +37,27 @@ Individual objects within the environment are scanned to create detailed 3D mode
 3. Generate a textured 3D mesh
 4. Export the object model in a standard format (e.g., OBJ, PLY, GLTF)
 
-### 2.2 Object Tracking: FoundationPose 🤖
+---
+
+### 2.2 Collecting Human Demos 🎬
+
+Run `collect_human_demo.py` to collect demonstration data. We have provided code for the ZED camera.
+
+**Inputs:**
+- `serial_number`: ZED Camera serial number
+- `save_dir`: Directory to save collected data
+
+**Usage:**
+```bash
+python collect_human_demo.py --serial_number <SERIAL_NUMBER> --save_dir <SAVE_DIR>
+```
+---
+
+### 2.3 Object Tracking: FoundationPose 🤖
 
 [FoundationPose](https://github.com/NVlabs/FoundationPose) provides model-based 6DoF pose estimation for tracking objects in real-time.
 
 #### 📥 Installation
-
 ```bash
 git clone https://github.com/NVlabs/FoundationPose.git
 cd FoundationPose
@@ -57,16 +72,35 @@ During installation, you may encounter the following issues:
 2. [Update C++ version to 17](https://github.com/NVlabs/FoundationPose/issues/35)
 3. [Build without ninja](https://github.com/NVlabs/FoundationPose/issues/241)
 
-#### 🔧 Input Requirements
+#### 🚀 After Installation
 
-FoundationPose requires four inputs:
+Once installation and setup are complete, copy the two provided files into your FoundationPose directory:
+```
+FoundationPose/
+├── fp_objects.py
+├── generate_mask.py
+```
 
-1. **RGB-D Images:** Video frames with color and depth information
-2. **Camera Intrinsics:** Focal length and principal point parameters
-3. **Object Mesh(es):** 3D model(s) in OBJ format
-4. **Object Mask(s):** Segmentation mask for the first frame
+**Command:**
+```bash
+mv fp_objects.py generate_mask.py FoundationPose/
+```
 
-**Our Setup:**
-- RGB-D Video + Camera Intrinsics: ZED 2i Camera
-- Object Meshes: Polycam scans (see Section 2.1)
-- Object Masks: SAM2 with bounding box query
+#### 📋 Input Requirements
+
+**`fp_objects.py`** requires three inputs:
+
+| Parameter | Description |
+|-----------|-------------|
+| **`rgbd_frames_directory`** | Directory containing two subfolders:<br>• `rgb/` - RGB frames from your video<br>• `depth/` - Depth frames in uint16 format |
+| **`object_meshes`** | Path(s) to mesh file(s) for tracking (`.obj` format) |
+| **`camera_to_robot`** | `.npy` file containing a 4×4 transformation matrix from camera to robot frame |
+
+**Usage:**
+```bash
+python fp_objects.py --rgbd_frames_directory <DEMO_DIR> --object_meshes <OBJ_1> <OBJ_2> --camera_to_robot <CAMERA_TO_ROBOT>
+```
+
+#### 🎥 Our Setup
+
+- **Camera**: ZED 2i
