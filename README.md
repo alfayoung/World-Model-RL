@@ -32,9 +32,11 @@ Cornell University
 - [Citation](#-citation)
 
 ## 📁 Project Structure
-
 ```
 X-Sim/
+├── real_to_sim/
+│   ├── FoundationPose/                    # Object Tracking
+│   ├── collect_human_demo.py              # Human Data Collection Script
 ├── simulation/
 │   ├── ManiSkill/                    # ManiSkill simulation environment
 │   ├── scripts/                     # RL training and data generation scripts
@@ -60,7 +62,8 @@ bash setup.sh
 X-Sim's pipeline consists of three main phases:
 
 ### Phase 1: Real-to-Sim
-- **Real-to-Sim** *(Code Coming Soon)*: Construct photorealistic simulation and track object poses from human videos
+- **Real-to-Sim**: Construct photorealistic simulation and track object poses from human videos
+  - 📖 **[Real-to-Sim](real_to_sim/REAL-TO-SIM.md)**
 
 ### Phase 2: RL Training in Sim
 - **RL Training**: Learn robot policies with object-centric rewards
@@ -74,10 +77,13 @@ X-Sim's pipeline consists of three main phases:
 
 ## 🚀 Quick Start
 
+### Real-to-Sim Setup
+
+For detailed instructions on environment scanning, object tracking, and human demo collection, see our **[Real-to-Sim Pipeline Documentation](real_to_sim/REAL-TO-SIM.md)**.
+
 ### Full Pipeline
 
 Run the complete X-Sim pipeline for any task with a single command:
-
 ```bash
 python run_pipeline.py --env_id "Mustard-Place"
 ```
@@ -108,10 +114,17 @@ To add your own tasks, refer to files in ```simulation/ManiSkill/mani_skill/envs
 
 ## 📖 Detailed Usage
 
-### Step 1: RL Training
+### Step 1: Real-to-Sim Pipeline
+
+Before training, you need to capture and process real-world data. See our **[Real-to-Sim Pipeline Documentation](real_to_sim/REAL-TO-SIM.md)** for:
+- Environment scanning with 2D Gaussian Splatting
+- Object mesh creation with Polycam
+- Human demonstration collection with ZED camera
+- Object pose tracking with FoundationPose
+
+### Step 2: RL Training
 
 Train reinforcement learning policies with object-centric rewards:
-
 ```bash
 cd simulation
 python -m scripts.rl_training \
@@ -124,10 +137,9 @@ python -m scripts.rl_training \
     --num_eval_steps=<EVAL_STEPS>
 ```
 
-### Step 2: Synthetic Data Collection
+### Step 3: Synthetic Data Collection
 
 Generate demonstration trajectories using the trained RL policies:
-
 ```bash
 cd simulation
 python -m scripts.data_generation_rgb \
@@ -140,10 +152,9 @@ python -m scripts.data_generation_rgb \
     --randomize_camera
 ```
 
-### Step 3: Image-Conditioned Diffusion Policy Training
+### Step 4: Image-Conditioned Diffusion Policy Training
 
 Train diffusion policies on the synthetic demonstration data:
-
 ```bash
 cd diffusion_policy
 python -m scripts.dp_training_rgb \
@@ -158,9 +169,8 @@ python -m scripts.dp_training_rgb \
     --epoch_len=10000
 ```
 
-### Step 4: Auto-Calibration Data Generation
+### Step 5: Auto-Calibration Data Generation
 Create real-sim paired RGB dataset using real rollout data and replaying it in sim:
-
 ```bash
 cd diffusion_policy
 python -m scripts.auto_calibration \
@@ -171,10 +181,9 @@ python -m scripts.auto_calibration \
 *Note*: You should adapt ```diffusion_policy/scripts/eval_dp.py``` to your robot hardware for real-world deployment.
 
 
-### Step 5: Calibrated Policy - Training with Auxiliary Loss
+### Step 6: Calibrated Policy - Training with Auxiliary Loss
 
 Fine-tune the policy with calibration auxiliary loss:
-
 ```bash
 cd diffusion_policy
 python -m scripts.dp_training_rgb \
@@ -196,7 +205,6 @@ python -m scripts.dp_training_rgb \
 ### Evaluation
 
 Evaluate trained diffusion policies:
-
 ```bash
 cd diffusion_policy
 python -m scripts.eval_dp \
@@ -208,7 +216,6 @@ python -m scripts.eval_dp \
 ## 📚 Citation
 
 If you find this work useful, please cite:
-
 ```bibtex
 @article{dan2025xsim,
     title={X-Sim: Cross-Embodiment Learning via Real-to-Sim-to-Real}, 
