@@ -3,6 +3,10 @@
 </div>
 
 <div align="center">
+  <h3><b> Oral @ CoRL 2025 </b></h3>
+</div>
+
+<div align="center">
 
 ### [Prithwish Dan](https://pdan101.github.io/)<sup>\*</sup>, [Kushal Kedia](https://kushal2000.github.io/)<sup>\*</sup>, Angela Chao, Edward W. Duan, Maximus A. Pace, <br>[Wei-Chiu Ma](https://www.cs.cornell.edu/~weichiu/), [Sanjiban Choudhury](https://sanjibanc.github.io/)
 
