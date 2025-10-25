@@ -103,6 +103,11 @@ During installation, you may encounter the following issues:
 2. [Update C++ version to 17](https://github.com/NVlabs/FoundationPose/issues/35)
 3. [Build without ninja](https://github.com/NVlabs/FoundationPose/issues/241)
 
+We recommend using SAM to obtain segmentation masks (code provided in `generate_mask.py`), which can be installed as follows:
+```bash
+pip install transformers==4.40.2
+```
+
 #### 🚀 After Installation
 
 Once installation and setup are complete, copy the two provided files into your FoundationPose directory:
