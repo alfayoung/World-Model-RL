@@ -201,6 +201,7 @@ def segment_with_box(
 
 def box_based_segmentation(
     image: Union[Image.Image, np.ndarray],
+    bbox: Optional[BoundingBox] = None,
     polygon_refinement: bool = False,
     segmenter_id: Optional[str] = None
 ) -> Tuple[np.ndarray, Optional[np.ndarray]]:
@@ -219,8 +220,12 @@ def box_based_segmentation(
         image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
     
     # Open UI to let user select a bounding box
-    box = click_box_points(image)
-    
+    if bbox is None:
+        box = click_box_points(image)
+    else:
+        box = BoundingBox(xmin=bbox[0], ymin=bbox[1], xmax=bbox[2], ymax=bbox[3])
+        print(f"Using user provided bounding box: {box}")
+
     # If no box selected, return None for mask
     if box is None:
         return np.array(image), None
@@ -232,7 +237,7 @@ def box_based_segmentation(
 
 
 # Function to generate binary mask using interactive box-based SAM
-def generate_binary_mask_box(image, polygon_refinement=True):
+def generate_binary_mask_box(image, bbox=None, polygon_refinement=True):
     if isinstance(image, np.ndarray):
         pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
     else:
@@ -240,16 +245,19 @@ def generate_binary_mask_box(image, polygon_refinement=True):
         
     segmenter_id = "facebook/sam-vit-base"
     
-    _, mask = box_based_segmentation(pil_image, polygon_refinement, segmenter_id)
+    _, mask = box_based_segmentation(pil_image, bbox, polygon_refinement, segmenter_id)
     return mask
 
 
-def save_box_mask_to_file(workspace, polygon_refinement=True):
-    """Save a mask generated with interactive box selection to a file"""
+def save_box_mask_to_file(workspace, bbox=None, polygon_refinement=True):
+    """
+    Save a mask generated with interactive box selection to a file
+    bbox: (xmin, ymin, xmax, ymax)
+    """
     pathlib.Path(f'{workspace}/masks').mkdir(parents=True, exist_ok=True)
     
     image = cv2.imread(f'{workspace}/rgb/frame_0000.png')
-    binary_mask = generate_binary_mask_box(image, polygon_refinement)
+    binary_mask = generate_binary_mask_box(image, bbox, polygon_refinement)
     
     if binary_mask is not None:
         binary_mask = (binary_mask > 0).astype(np.uint8) * 255

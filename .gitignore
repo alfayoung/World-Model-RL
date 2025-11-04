@@ -53,3 +53,6 @@ imgui.ini
 # testing
 .coverage*
 htmlcov/
+
+# local datasets
+/datasets

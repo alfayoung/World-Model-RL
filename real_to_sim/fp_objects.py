@@ -17,7 +17,7 @@ import copy
 import shutil
 
 
-def main(rgbd_frames_directory, object_meshes, camera_to_robot, est_refine_iter=5, track_refine_iter=2, debug=1):
+def main(rgbd_frames_directory, object_meshes, camera_to_robot, first_frame_bbox=None, est_refine_iter=5, track_refine_iter=2, debug=1):
   """
   Main function for FoundationPose object tracking.
   
@@ -78,7 +78,7 @@ def main(rgbd_frames_directory, object_meshes, camera_to_robot, est_refine_iter=
       color = reader.get_color(i)
       depth = reader.get_depth(i)
       if i==0:
-        save_box_mask_to_file(save_directory)
+        save_box_mask_to_file(save_directory, bbox=first_frame_bbox)
         mask = reader.get_mask(0).astype(bool)
         pose = est.register(K=reader.K, rgb=color, depth=depth, ob_mask=mask, iteration=est_refine_iter)
 
@@ -106,19 +106,18 @@ def main(rgbd_frames_directory, object_meshes, camera_to_robot, est_refine_iter=
       quat = np.roll(quat, 1)
       oned_pose = np.concatenate((xyz, quat))
       poses.append(oned_pose)
-      
+
       if debug>=1:
         center_pose = orig_pos
         print(f"Orig pose: {Rotation.from_matrix(orig_pos[:3, :3]).as_euler('xyz', degrees=True)}")
         print(f"rot robot: {Rotation.from_matrix(rot).as_euler('xyz', degrees=True)}")
         vis = draw_xyz_axis(color, ob_in_cam=center_pose, scale=0.1, K=reader.K, thickness=3, transparency=0, is_input_rgb=True)
-        cv2.imshow('1', vis[...,::-1])
-        cv2.waitKey(1)
-
-
-      if debug>=2:
+        # cv2.imshow('1', vis[...,::-1])
+        # cv2.waitKey(1)
         os.makedirs(f'{debug_dir}/track_vis_{j}', exist_ok=True)
         imageio.imwrite(f'{debug_dir}/track_vis_{j}/{reader.id_strs[i]}.png', vis)
+        if debug>=2:
+          input(f"Image saved to {debug_dir}/track_vis_{j}/{reader.id_strs[i]}.png. Press Enter to continue...")
 
     all_poses.append(poses)
 
@@ -134,9 +133,11 @@ if __name__ == '__main__':
   parser.add_argument('--rgbd_frames_directory', type=str, required=True, help='Directory containing RGBD frames')
   parser.add_argument('--object_meshes', type=str, nargs='+', required=True, help='List of object mesh file paths')
   parser.add_argument('--camera_to_robot', type=str, default=f'{code_dir}/transforms_kitchen_new.npy', help='Path to camera-to-robot transformation file')
+  parser.add_argument('--first_frame_bbox', type=int, nargs=4, default=None, help='Bounding box for the first frame in format (xmin ymin xmax ymax)')
   args = parser.parse_args()
   main(
     args.rgbd_frames_directory,
     args.object_meshes,
-    args.camera_to_robot
-  ) 
+    args.camera_to_robot,
+    first_frame_bbox=args.first_frame_bbox
+  )
