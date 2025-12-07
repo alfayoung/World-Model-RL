@@ -90,7 +90,8 @@ def obs_to_qpos(obs, variant):
 
 def trajwise_alternating_training_loop(variant, agent, env, eval_env, online_replay_buffer, replay_buffer, wandb_logger,
                                        perform_control_evals=True, shard_fn=None, agent_dp=None,
-                                       canonical_mgr=None, latent_tracker=None, evolution_plotter=None):
+                                       canonical_mgr=None, latent_tracker=None, evolution_plotter=None,
+                                       proprio_tracker=None, proprio_plotter=None):
     replay_buffer_iterator = replay_buffer.get_iterator(variant.batch_size)
     if shard_fn is not None:
         replay_buffer_iterator = map(shard_fn, replay_buffer_iterator)
@@ -103,7 +104,7 @@ def trajwise_alternating_training_loop(variant, agent, env, eval_env, online_rep
     
     with tqdm(total=variant.max_steps, initial=0) as pbar:
         while i <= variant.max_steps:
-            traj = collect_traj(variant, agent, env, i, agent_dp)
+            traj = collect_traj(variant, agent, env, i, agent_dp, proprio_tracker)
             traj_id = online_replay_buffer._traj_counter
             add_online_data_to_buffer(variant, traj, online_replay_buffer)
             total_env_steps += traj['env_steps']
@@ -206,6 +207,55 @@ def trajwise_alternating_training_loop(variant, agent, env, eval_env, online_rep
 
                                 print(f"[Latent Viz] Generated evolution plots at step {i} ({len(state_figures)} individual states)")
 
+                        # Generate proprioceptive trajectory visualizations
+                        if proprio_tracker is not None and proprio_plotter is not None:
+                            if len(proprio_tracker.trajectories) > 0:
+                                import matplotlib.pyplot as plt
+
+                                # Get recent trajectories
+                                recent_trajs = proprio_tracker.get_recent_trajectories(n=10)
+                                recent_successful = proprio_tracker.get_recent_trajectories(n=5, only_successful=True)
+
+                                # Plot all recent trajectories
+                                fig_all = proprio_plotter.plot_trajectories(
+                                    recent_trajs,
+                                    title=f"Recent Proprioceptive Trajectories (Step {i})",
+                                    label_trajectories=False
+                                )
+
+                                # Plot successful trajectories only (if any)
+                                log_dict = {'proprio_trajectories/recent_all': wandb.Image(fig_all)}
+
+                                if len(recent_successful) > 0:
+                                    fig_success = proprio_plotter.plot_trajectories(
+                                        recent_successful,
+                                        title=f"Recent Successful Trajectories (Step {i})",
+                                        colormap='viridis',
+                                        label_trajectories=False
+                                    )
+                                    log_dict['proprio_trajectories/recent_successful'] = wandb.Image(fig_success)
+                                    plt.close(fig_success)
+
+                                    # Plot single latest successful trajectory with time gradient
+                                    latest_successful = recent_successful[-1]
+                                    fig_single = proprio_plotter.plot_single_trajectory(
+                                        latest_successful,
+                                        title=f"Latest Successful Trajectory (Episode {latest_successful.episode_id})"
+                                    )
+                                    log_dict['proprio_trajectories/latest_successful_single'] = wandb.Image(fig_single)
+                                    plt.close(fig_single)
+
+                                # Log to wandb
+                                wandb_logger.log(log_dict, step=i)
+                                plt.close(fig_all)
+
+                                # Print stats
+                                stats = proprio_tracker.get_stats()
+                                print(f"[Proprio Viz] Generated trajectory plots at step {i}")
+                                print(f"  Total trajectories: {stats['num_trajectories']}")
+                                print(f"  Success rate: {stats['success_rate']:.2%}")
+                                print(f"  Avg trajectory length: {stats['avg_length']:.1f}")
+
                     if variant.checkpoint_interval != -1 and i % variant.checkpoint_interval == 0:
                         agent.save_checkpoint(variant.outputdir, i, variant.checkpoint_interval)
 
@@ -240,27 +290,37 @@ def add_online_data_to_buffer(variant, traj, online_replay_buffer):
         online_replay_buffer.insert(insert_dict)
     online_replay_buffer.increment_traj_counter()
 
-def collect_traj(variant, agent, env, i, agent_dp=None):
+def collect_traj(variant, agent, env, i, agent_dp=None, proprio_tracker=None):
     query_frequency = variant.query_freq
     max_timesteps = variant.max_timesteps
     env_max_reward = variant.env_max_reward
 
     agent._rng, rng = jax.random.split(agent._rng)
-    
+
     if 'libero' in variant.env:
         obs = env.reset()
     elif 'aloha' in variant.env:
         obs, _ = env.reset()
-    
+
     image_list = [] # for visualization
     rewards = []
     action_list = []
     obs_list = []
+    qpos_list = []  # for proprioceptive tracking
+
+    # Start tracking proprioceptive trajectory
+    if proprio_tracker is not None:
+        proprio_tracker.start_trajectory(training_step=i)
 
     for t in tqdm(range(max_timesteps)):
         curr_image = obs_to_img(obs, variant)
-        
+
         qpos = obs_to_qpos(obs, variant)
+        qpos_list.append(qpos)
+
+        # Record proprioceptive state
+        if proprio_tracker is not None:
+            proprio_tracker.record_state(qpos, t)
 
         if variant.add_states:
             obs_dict = {
@@ -322,8 +382,11 @@ def collect_traj(variant, agent, env, i, agent_dp=None):
     episode_return = np.sum(rewards[rewards!=None])
     is_success = (reward == env_max_reward)
     print(f'Rollout Done: {episode_return=}, Success: {is_success}')
-    
-    
+
+    # End proprioceptive trajectory tracking
+    if proprio_tracker is not None:
+        proprio_tracker.end_trajectory(success=is_success, episode_return=episode_return)
+
     '''
     We use sparse -1/0 reward to train the SAC agent.
     '''
@@ -344,7 +407,8 @@ def collect_traj(variant, agent, env, i, agent_dp=None):
         'is_success': is_success,
         'episode_return': episode_return,
         'images': image_list,
-        'env_steps': t + 1 
+        'env_steps': t + 1,
+        'qpos_trajectory': np.array(qpos_list)  # Add proprioceptive trajectory
     }
 
 def perform_control_eval(agent, env, i, variant, wandb_logger, agent_dp=None):

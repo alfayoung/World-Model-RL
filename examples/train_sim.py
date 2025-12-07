@@ -32,7 +32,9 @@ from jax.experimental.compilation_cache import compilation_cache
 from latent_policy_viz import (
     CanonicalStateManager,
     LatentPolicyTracker,
-    LatentEvolutionPlotter
+    LatentEvolutionPlotter,
+    ProprioceptiveTracker,
+    ProprioceptivePlotter
 )
 import matplotlib.pyplot as plt
 
@@ -176,9 +178,27 @@ def main(variant):
     evolution_plotter = LatentEvolutionPlotter(method=variant.get('latent_viz_method', 'pca'))
     print(f"Initialized latent policy visualization: {canonical_mgr.get_num_states()} states, method={variant.get('latent_viz_method', 'pca')}")
 
+    # Initialize proprioceptive trajectory visualization
+    # Determine end-effector indices based on environment
+    if variant.env == 'libero':
+        # For LIBERO: state is [eef_pos (3), eef_rot (3), gripper (2)]
+        eef_indices = [0, 1, 2]  # End-effector position (x, y, z)
+    elif variant.env == 'aloha_cube':
+        # For ALOHA: state is 14-dim joint positions
+        # We'll use PCA mode to reduce to 3D
+        eef_indices = None
+    else:
+        eef_indices = [0, 1, 2]
+
+    proprio_mode = variant.get('proprio_viz_mode', 'eef_pos' if variant.env == 'libero' else 'pca')
+    proprio_tracker = ProprioceptiveTracker(max_trajectories=variant.get('proprio_viz_max_trajs', 100))
+    proprio_plotter = ProprioceptivePlotter(mode=proprio_mode, eef_indices=eef_indices)
+    print(f"Initialized proprioceptive trajectory visualization: mode={proprio_mode}, max_trajs={variant.get('proprio_viz_max_trajs', 100)}")
+
     trajwise_alternating_training_loop(
         variant, agent, env, eval_env, online_replay_buffer, replay_buffer, wandb_logger,
         shard_fn=shard_fn, agent_dp=agent_dp,
-        canonical_mgr=canonical_mgr, latent_tracker=latent_tracker, evolution_plotter=evolution_plotter
+        canonical_mgr=canonical_mgr, latent_tracker=latent_tracker, evolution_plotter=evolution_plotter,
+        proprio_tracker=proprio_tracker, proprio_plotter=proprio_plotter
     )
  

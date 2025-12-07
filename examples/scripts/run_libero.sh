@@ -1,6 +1,6 @@
 #!/bin/bash
 proj_name=DSRL_pi0_Libero
-device_id=6
+device_id=1
 
 export DISPLAY=:0
 export MUJOCO_GL=egl
@@ -27,10 +27,10 @@ python3 examples/launch_train_sim.py \
 --discount 0.999 \
 --seed 0 \
 --max_steps 500000  \
---eval_interval 10000 \
---log_interval 500 \
+--eval_interval 100 \
+--log_interval 50 \
 --eval_episodes 10 \
---latent_viz_init_step 1000 \
+--latent_viz_init_step 0 \
 --multi_grad_step 20 \
 --start_online_updates 500 \
 --resize_image 64 \
