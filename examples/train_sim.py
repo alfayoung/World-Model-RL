@@ -28,6 +28,14 @@ from examples.train_utils_sim import trajwise_alternating_training_loop
 import tensorflow as tf
 from jax.experimental.compilation_cache import compilation_cache
 
+# Latent policy evolution visualization
+from latent_policy_viz import (
+    CanonicalStateManager,
+    LatentPolicyTracker,
+    LatentEvolutionPlotter
+)
+import matplotlib.pyplot as plt
+
 from openpi.training import config as openpi_config
 from openpi.policies import policy_config
 from openpi.shared import download
@@ -110,8 +118,8 @@ def main(variant):
     
     if variant.env == 'libero':
         benchmark_dict = benchmark.get_benchmark_dict()
-        task_suite = benchmark_dict["libero_90"]()
-        task_id = 57
+        task_suite = benchmark_dict[variant.libero_suite]()
+        task_id = variant.task_id
         task = task_suite.get_task(task_id)
         env, task_description = _get_libero_env(task, 256, variant.seed)
         eval_env = env
@@ -146,6 +154,7 @@ def main(variant):
 
     if variant.env == 'libero':
         config = openpi_config.get_config("pi0_libero")
+        # checkpoint_dir = download.maybe_download("s3://openpi-assets/checkpoints/pi0_base")
         checkpoint_dir = download.maybe_download("s3://openpi-assets/checkpoints/pi0_libero")
     elif variant.env == 'aloha_cube':
         config = openpi_config.get_config("pi0_aloha_sim")
@@ -160,5 +169,16 @@ def main(variant):
     online_replay_buffer = ReplayBuffer(dummy_env.observation_space, dummy_env.action_space, int(online_buffer_size))
     replay_buffer = online_replay_buffer
     replay_buffer.seed(variant.seed)
-    trajwise_alternating_training_loop(variant, agent, env, eval_env, online_replay_buffer, replay_buffer, wandb_logger, shard_fn=shard_fn, agent_dp=agent_dp)
+
+    # Initialize latent policy evolution visualization
+    canonical_mgr = CanonicalStateManager(num_states=variant.get('latent_viz_num_states', 15))
+    latent_tracker = LatentPolicyTracker()
+    evolution_plotter = LatentEvolutionPlotter(method=variant.get('latent_viz_method', 'pca'))
+    print(f"Initialized latent policy visualization: {canonical_mgr.get_num_states()} states, method={variant.get('latent_viz_method', 'pca')}")
+
+    trajwise_alternating_training_loop(
+        variant, agent, env, eval_env, online_replay_buffer, replay_buffer, wandb_logger,
+        shard_fn=shard_fn, agent_dp=agent_dp,
+        canonical_mgr=canonical_mgr, latent_tracker=latent_tracker, evolution_plotter=evolution_plotter
+    )
  

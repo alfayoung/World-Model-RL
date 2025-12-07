@@ -11,8 +11,11 @@ if __name__ == '__main__':
     parser.add_argument('--launch_group_id', default='', help='group id used to group runs on wandb.')
     parser.add_argument('--eval_episodes', default=10,help='Number of episodes used for evaluation.', type=int)
     parser.add_argument('--env', default='libero', help='name of environment')
+    parser.add_argument('--libero_suite', default='libero_90', help='LIBERO benchmark suite name (e.g., libero_90, libero_10, etc.)')
+    parser.add_argument('--task_id', default=57, help='Task ID within the LIBERO suite', type=int)
     parser.add_argument('--log_interval', default=1000, help='Logging interval.', type=int)
     parser.add_argument('--eval_interval', default=5000, help='Eval interval.', type=int)
+    parser.add_argument('--latent_viz_init_step', default=5000, help='Step to initialize latent policy visualization.', type=int)
     parser.add_argument('--checkpoint_interval', default=-1, help='checkpoint interval.', type=int)
     parser.add_argument('--batch_size', default=16, help='Mini batch size.', type=int)
     parser.add_argument('--max_steps', default=int(1e6), help='Number of training steps.', type=int)
@@ -49,7 +52,7 @@ if __name__ == '__main__':
         num_qs=10,
         action_magnitude=1.0,
         num_cameras=1,
-        )
+    )
 
     variant, args = parse_training_args(train_args_dict, parser)
     print(variant)
