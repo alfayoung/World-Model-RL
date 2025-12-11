@@ -307,11 +307,46 @@ def collect_K_twin_trajectories(
 
         # Compute Q_twin value at terminal state for scoring
         if len(traj['actions']) > 0:
-            terminal_obs = traj['observations'][-2]  # Last obs before final
-            terminal_action = traj['actions'][-1]  # Last action
+            match variant.est_advantage:
+                case 'last':
+                    terminal_obs = traj['observations'][-2]  # Last obs before final
+                    terminal_action = traj['actions'][-1]  # Last action
+                    terminal_q = agent.get_twin_q_value(terminal_obs, terminal_action)
+                case 'avg':
+                    import time
+                    start_time_avg = time.time()
+                    terminal_q = np.mean([
+                        agent.get_twin_q_value(o, a) * (0.95 ** i)
+                        for i, (o, a) in enumerate(zip(traj['observations'][-2::-variant.query_freq],
+                                                        traj['actions'][-1::-variant.query_freq]))
+                    ])
+                    end_time_avg = time.time()
+                    execution_time_avg = end_time_avg - start_time_avg
+
+                    # Measure execution time for 'avg_faster' method
+                    start_time_avg_faster = time.time()
+                    obs = traj['observations'][-2::-variant.query_freq]
+                    acts = traj['actions'][-1::-variant.query_freq]
+                    discounts = 0.95 ** jnp.arange(len(obs))
+                    stack_obs = lambda obs_list: {  # noqa: E731
+                        k: jnp.stack([o[k] for o in obs_list], axis=0)
+                        for k in obs_list[0].keys()
+                    }
+                    obs = stack_obs(obs)
+                    acts = jnp.asarray(acts)
+                    terminal_q_q = float(jnp.mean(agent.get_twin_q_value_batch(obs, acts) * discounts))
+                    print(f"{terminal_q} vs {terminal_q_q}")
+                    end_time_avg_faster = time.time()
+                    execution_time_avg_faster = end_time_avg_faster - start_time_avg_faster
+
+                    # Print execution times
+                    print(f"Execution time for 'avg': {execution_time_avg:.6f} seconds")
+                    print(f"Execution time for 'avg_faster': {execution_time_avg_faster:.6f} seconds")
+                case _:
+                    raise NotImplementedError(_)
 
             # Get Q_twin values (ensemble)
-            terminal_q = agent.get_twin_q_value(terminal_obs, terminal_action)
+            
         else:
             terminal_q = 0.0
 
@@ -788,8 +823,8 @@ def execute_real_trajectory_with_seed(
     episode_return = np.sum(rewards[rewards != None])
     is_success = (reward == env_max_reward)
     # Get Q_twin values (ensemble)
-    terminal_q = agent.get_real_q_value(obs_list[-2], action_list[-1])
-    print(f'Real Rollout Done: episode_return={episode_return}, Success: {is_success}, Terminal Q Value: {terminal_q}')
+    terminal_q = float(agent.get_real_q_value(obs_list[-2], action_list[-1]))
+    print(f'Real Rollout Done: episode_return={episode_return}, Success: {is_success}, Terminal Q Value: {terminal_q:.3f}')
 
     # Save video if requested
     if save_video:
