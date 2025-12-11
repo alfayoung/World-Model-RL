@@ -1,3 +1,4 @@
+import pathlib
 from tqdm import tqdm
 import numpy as np
 import wandb
@@ -5,6 +6,13 @@ import jax
 from openpi_client import image_tools
 import math
 import PIL
+import imageio
+import os
+from pathlib import Path
+
+from libero.libero import benchmark
+from libero.libero import get_libero_path
+from libero.libero.envs import OffScreenRenderEnv
 
 def _quat2axisangle(quat):
     """
@@ -98,14 +106,18 @@ def trajwise_alternating_training_loop(variant, agent, env, eval_env, online_rep
 
     total_env_steps = 0
     i = 0
+    episode_count = 0
     wandb_logger.log({'num_online_samples': 0}, step=i)
     wandb_logger.log({'num_online_trajs': 0}, step=i)
     wandb_logger.log({'env_steps': 0}, step=i)
-    
+
     with tqdm(total=variant.max_steps, initial=0) as pbar:
         while i <= variant.max_steps:
-            traj = collect_traj(variant, agent, env, i, agent_dp, proprio_tracker)
+            # Enable video saving based on variant settings
+            traj = collect_traj(variant, agent, env, i, agent_dp, proprio_tracker,
+                              save_video=True, episode=episode_count)
             traj_id = online_replay_buffer._traj_counter
+            episode_count += 1
             add_online_data_to_buffer(variant, traj, online_replay_buffer)
             total_env_steps += traj['env_steps']
             print('online buffer timesteps length:', len(online_replay_buffer))
@@ -291,7 +303,7 @@ def add_online_data_to_buffer(variant, traj, online_replay_buffer):
         online_replay_buffer.insert(insert_dict)
     online_replay_buffer.increment_traj_counter()
 
-def collect_traj(variant, agent, env, i, agent_dp=None, proprio_tracker=None):
+def collect_traj(variant, agent, env, i, agent_dp=None, proprio_tracker=None, save_video=False, video_base_dir=None, episode=None):
     query_frequency = variant.query_freq
     max_timesteps = variant.max_timesteps
     env_max_reward = variant.env_max_reward
@@ -304,6 +316,7 @@ def collect_traj(variant, agent, env, i, agent_dp=None, proprio_tracker=None):
         obs, _ = env.reset()
 
     image_list = [] # for visualization
+    video_image_list = []  # Collect images for video (original resolution)
     rewards = []
     action_list = []
     obs_list = []
@@ -313,8 +326,20 @@ def collect_traj(variant, agent, env, i, agent_dp=None, proprio_tracker=None):
     if proprio_tracker is not None:
         proprio_tracker.start_trajectory(training_step=i)
 
+    # Set up video directory with clear structure
+    if save_video:
+        if video_base_dir is None:
+            video_base_dir = os.path.join(variant.outputdir, "trajectory_videos")
+        video_dir = Path(video_base_dir)
+        video_dir.mkdir(parents=True, exist_ok=True)
+        print(f"[DEBUG] Video base directory: {video_dir}")
+
     for t in tqdm(range(max_timesteps)):
         curr_image = obs_to_img(obs, variant)
+
+        # Save image for video at the start of the timestep
+        if save_video:
+            video_image_list.append(curr_image)
 
         qpos = obs_to_qpos(obs, variant)
         qpos_list.append(qpos)
@@ -377,12 +402,36 @@ def collect_traj(variant, agent, env, i, agent_dp=None, proprio_tracker=None):
     }
     obs_list.append(obs_dict)
     image_list.append(curr_image)
-    
+
+    # Save final image for video
+    if save_video:
+        video_image_list.append(curr_image)
+
     # per episode
     rewards = np.array(rewards)
     episode_return = np.sum(rewards[rewards!=None])
     is_success = (reward == env_max_reward)
     print(f'Rollout Done: {episode_return=}, Success: {is_success}')
+
+    # Save video if requested
+    if save_video:
+        # Create video directory structure with clear naming
+        video_subdir = Path(video_dir) / f"step_{i:07d}"
+        video_subdir.mkdir(parents=True, exist_ok=True)
+
+        # Create informative filename
+        success_tag = "success" if is_success else "fail"
+        if episode is not None:
+            video_filename = f"ep_{episode}_ret_{episode_return:.2f}_{success_tag}.mp4"
+        else:
+            video_filename = f"step_{i}_ret_{episode_return:.2f}_{success_tag}.mp4"
+        video_path = video_subdir / video_filename
+
+        # Save video using imageio
+        print(f"[DEBUG] Saving trajectory video to: {video_path}")
+        images_uint8 = [img.astype(np.uint8) for img in video_image_list]
+        imageio.mimsave(str(video_path), images_uint8, fps=20)
+        print(f"[DEBUG] Video saved successfully: {video_path}")
 
     # End proprioceptive trajectory tracking
     if proprio_tracker is not None:
@@ -412,6 +461,19 @@ def collect_traj(variant, agent, env, i, agent_dp=None, proprio_tracker=None):
         'qpos_trajectory': np.array(qpos_list)  # Add proprioceptive trajectory
     }
 
+def _get_libero_env(variant):
+    """Initializes and returns the LIBERO environment, along with the task description."""
+    benchmark_dict = benchmark.get_benchmark_dict()
+    task_suite = benchmark_dict[variant.libero_suite]()
+    task_id = variant.task_id
+    task = task_suite.get_task(task_id)
+    task_bddl_file = pathlib.Path(get_libero_path("bddl_files")) / task.problem_folder / task.bddl_file
+    env_args = {"bddl_file_name": task_bddl_file, "camera_heights": 256, "camera_widths": 256}
+    env = OffScreenRenderEnv(**env_args)
+    env.seed(variant.seed)
+    initial_states = task_suite.get_task_init_states(task_id)
+    return env, initial_states
+
 def perform_control_eval(agent, env, i, variant, wandb_logger, agent_dp=None):
     query_frequency = variant.query_freq
     print('query frequency', query_frequency)
@@ -423,10 +485,15 @@ def perform_control_eval(agent, env, i, variant, wandb_logger, agent_dp=None):
     episode_lens = []
 
     rng = jax.random.PRNGKey(variant.seed+456)
+    
+    if 'libero' in variant.env:
+        # ensure fair evaluation with fixed initial states
+        env, initial_states = _get_libero_env(variant)
 
     for rollout_id in range(variant.eval_episodes):
         if 'libero' in variant.env:
-            obs = env.reset()
+            env.reset()
+            obs = env.set_init_state(initial_states[rollout_id])
         elif 'aloha' in variant.env:
             obs, _ = env.reset()
             
