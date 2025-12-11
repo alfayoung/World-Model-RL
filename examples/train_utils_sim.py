@@ -110,6 +110,7 @@ def trajwise_alternating_training_loop(variant, agent, env, eval_env, online_rep
             total_env_steps += traj['env_steps']
             print('online buffer timesteps length:', len(online_replay_buffer))
             print('online buffer num traj:', traj_id + 1)
+            print('success status:', traj['is_success'])
             print('total env steps:', total_env_steps)
             
             if variant.get("num_online_gradsteps_batch", -1) > 0:
