@@ -348,6 +348,9 @@ class TwinPixelSACLearner(Agent):
         self._target_critic_twin_params = target_critic_twin_params
         self._temp = temp
 
+        self.get_twin_q_value_batch = jax.jit(jax.vmap(self.get_twin_q_value))
+        self.get_real_q_value_batch = jax.jit(jax.vmap(self.get_real_q_value))
+
         if target_entropy is None or target_entropy == 'auto':
             self.target_entropy = -self.action_dim / 2
         else:
@@ -418,9 +421,9 @@ class TwinPixelSACLearner(Agent):
         input_collections = {'params': self._critic_twin.params}
         q_values = self._critic_twin.apply_fn(input_collections, observations, actions)
         if self.critic_reduction == 'min':
-            return float(q_values.min())
+            return q_values.min()
         elif self.critic_reduction == 'mean':
-            return float(q_values.mean())
+            return q_values.mean()
         else:
             raise NotImplementedError()
 
@@ -438,9 +441,9 @@ class TwinPixelSACLearner(Agent):
         input_collections = {'params': self._critic_real.params}
         q_values = self._critic_real.apply_fn(input_collections, observations, actions)
         if self.critic_reduction == 'min':
-            return float(q_values.min())
+            return q_values.min()
         elif self.critic_reduction == 'mean':
-            return float(q_values.mean())
+            return q_values.mean()
         else:
             raise NotImplementedError()
 

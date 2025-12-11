@@ -313,18 +313,6 @@ def collect_K_twin_trajectories(
                     terminal_action = traj['actions'][-1]  # Last action
                     terminal_q = agent.get_twin_q_value(terminal_obs, terminal_action)
                 case 'avg':
-                    import time
-                    start_time_avg = time.time()
-                    terminal_q = np.mean([
-                        agent.get_twin_q_value(o, a) * (0.95 ** i)
-                        for i, (o, a) in enumerate(zip(traj['observations'][-2::-variant.query_freq],
-                                                        traj['actions'][-1::-variant.query_freq]))
-                    ])
-                    end_time_avg = time.time()
-                    execution_time_avg = end_time_avg - start_time_avg
-
-                    # Measure execution time for 'avg_faster' method
-                    start_time_avg_faster = time.time()
                     obs = traj['observations'][-2::-variant.query_freq]
                     acts = traj['actions'][-1::-variant.query_freq]
                     discounts = 0.95 ** jnp.arange(len(obs))
@@ -334,14 +322,7 @@ def collect_K_twin_trajectories(
                     }
                     obs = stack_obs(obs)
                     acts = jnp.asarray(acts)
-                    terminal_q_q = float(jnp.mean(agent.get_twin_q_value_batch(obs, acts) * discounts))
-                    print(f"{terminal_q} vs {terminal_q_q}")
-                    end_time_avg_faster = time.time()
-                    execution_time_avg_faster = end_time_avg_faster - start_time_avg_faster
-
-                    # Print execution times
-                    print(f"Execution time for 'avg': {execution_time_avg:.6f} seconds")
-                    print(f"Execution time for 'avg_faster': {execution_time_avg_faster:.6f} seconds")
+                    terminal_q = float(jnp.mean(agent.get_twin_q_value_batch(obs, acts) * discounts))
                 case _:
                     raise NotImplementedError(_)
 

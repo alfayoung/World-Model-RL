@@ -42,6 +42,8 @@ if __name__ == '__main__':
     # ========== Double-Q Specific Arguments ==========
     parser.add_argument('--K_seeds', default=5,
                        help='Number of candidate trajectories to generate in twin env', type=int)
+    parser.add_argument('--est_advantage', default='avg',
+                       help='Mode to estimate advantage when selecting from K seeds', type=str)
     parser.add_argument('--beta_warmup_steps', default=5000,
                        help='Number of steps to linearly increase beta from 0 to beta_max', type=int)
     parser.add_argument('--beta_max', default=0.5,
