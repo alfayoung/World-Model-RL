@@ -40,8 +40,12 @@ if __name__ == '__main__':
     parser.add_argument('--query_freq', default=-1, help='query frequency', type=int)
 
     # ========== Double-Q Specific Arguments ==========
-    parser.add_argument('--K_seeds', default=5,
-                       help='Number of candidate trajectories to generate in twin env', type=int)
+    parser.add_argument('--K_seeds', default=8,
+                       help='Initial number of candidate trajectories (curriculum: high→low)', type=int)
+    parser.add_argument('--final_K_seeds', default=2,
+                       help='Final number of candidate trajectories after curriculum decay', type=int)
+    parser.add_argument('--k_decay_steps', default=100000,
+                       help='Number of steps to decay K_seeds from initial to final', type=int)
     parser.add_argument('--est_advantage', default='avg',
                        help='Mode to estimate advantage when selecting from K seeds', type=str)
     parser.add_argument('--beta_warmup_steps', default=5000,
@@ -81,6 +85,8 @@ if __name__ == '__main__':
 
     # Add Double-Q parameters to variant
     variant.K_seeds = args.K_seeds
+    variant.final_K_seeds = args.final_K_seeds
+    variant.k_decay_steps = args.k_decay_steps
     variant.beta_warmup_steps = args.beta_warmup_steps
     variant.beta_max = args.beta_max
     variant.twin_update_freq = args.twin_update_freq
@@ -93,7 +99,9 @@ if __name__ == '__main__':
         print(f"LIBERO Suite: {variant.libero_suite}, Task ID: {variant.task_id}")
     print(f"Seed: {variant.seed}")
     print(f"\nDouble-Q Parameters:")
-    print(f"  K_seeds (candidate trajectories): {variant.K_seeds}")
+    print(f"  K_seeds (initial): {variant.K_seeds}")
+    print(f"  final_K_seeds: {variant.final_K_seeds}")
+    print(f"  k_decay_steps: {variant.k_decay_steps}")
     print(f"  beta_warmup_steps: {variant.beta_warmup_steps}")
     print(f"  beta_max: {variant.beta_max}")
     print(f"  twin_update_freq: {variant.twin_update_freq}")

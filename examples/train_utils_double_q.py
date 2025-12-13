@@ -36,6 +36,21 @@ def beta_schedule(step: int, warmup_steps: int = 5000, beta_max: float = 0.5) ->
     """
     return min(step / warmup_steps, 1.0) * beta_max
 
+def compute_k_seeds(
+    training_step: int,
+    initial_k: int = 5,
+    final_k: int = 1,
+    decay_steps: int = 100000,
+    alpha: float = 1.0,
+) -> int:
+    if training_step >= decay_steps:
+        return final_k
+
+    progress = training_step / decay_steps
+    decay = jnp.exp(-alpha * progress)
+
+    k = final_k + (initial_k - final_k) * decay
+    return max(int(jnp.floor(k)), final_k)
 
 def compute_trajectory_score(
     twin_return: float,
@@ -434,7 +449,9 @@ def double_q_training_loop(
         ... (other standard arguments)
     """
     # Get Double-Q specific parameters
-    K_seeds = variant.get('K_seeds', 5)
+    initial_K_seeds = variant.get('K_seeds', 4)
+    final_K_seeds = variant.get('final_K_seeds', 1)
+    k_decay_steps = variant.get('k_decay_steps', 100000)
     beta_warmup_steps = variant.get('beta_warmup_steps', 5000)
     beta_max = variant.get('beta_max', 0.5)
     twin_update_freq = variant.get('twin_update_freq', 1)  # Update twin critic every N steps
@@ -457,14 +474,16 @@ def double_q_training_loop(
 
     with tqdm(total=variant.max_steps, initial=0) as pbar:
         # perform_control_eval(agent, eval_env, i, variant, wandb_logger, agent_dp)
-        
+        # exit(0)
+
         rng = jax.random.PRNGKey(variant.seed)
         while i <= variant.max_steps:
             # ========== Episode-Level Twin Planning ==========
             env_real.reset() # Ensure the real_env is fixed for twin planning
-            
-            # Compute current β
+
+            # Compute current β and K_seeds (dynamic curriculum)
             beta = beta_schedule(i, beta_warmup_steps, beta_max)
+            K_seeds = compute_k_seeds(i, initial_K_seeds, final_K_seeds, k_decay_steps)
 
             # Compute unique seeds for K trajectories
             seed_keys = []
