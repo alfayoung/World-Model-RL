@@ -144,7 +144,7 @@ def main(variant):
         
 
     group_name = variant.prefix + '_' + variant.launch_group_id
-    wandb_output_dir = tempfile.mkdtemp()
+    wandb_output_dir = os.environ.get('WANDB_DIR', tempfile.mkdtemp())
     wandb_logger = WandBLogger(variant.prefix != '', variant, variant.wandb_project, experiment_id=expname, output_dir=wandb_output_dir, group_name=group_name)
 
     dummy_env = DummyEnv(variant)

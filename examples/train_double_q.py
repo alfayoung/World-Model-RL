@@ -173,7 +173,7 @@ def main(variant):
 
     # ========== WandB Setup ==========
     group_name = variant.prefix + '_' + variant.launch_group_id
-    wandb_output_dir = tempfile.mkdtemp()
+    wandb_output_dir = os.environ.get('WANDB_DIR', tempfile.mkdtemp())
     wandb_logger = WandBLogger(
         variant.prefix != '', variant, variant.wandb_project,
         experiment_id=expname, output_dir=wandb_output_dir, group_name=group_name
@@ -218,7 +218,9 @@ def main(variant):
     real_replay_buffer.seed(variant.seed)
 
     # Twin buffer can be larger since we collect K trajectories per episode
-    twin_buffer_size = buffer_size * variant.get('K_seeds', 5)
+    # Use initial K_seeds for buffer sizing (buffer capacity is fixed at initialization)
+    initial_K_seeds = variant.get('K_seeds', 8)
+    twin_buffer_size = buffer_size * initial_K_seeds
     twin_replay_buffer = ReplayBuffer(
         dummy_env.observation_space,
         dummy_env.action_space,
@@ -228,7 +230,7 @@ def main(variant):
 
     print(f"\nReplay Buffers:")
     print(f"  Real buffer capacity: {buffer_size}")
-    print(f"  Twin buffer capacity: {twin_buffer_size}")
+    print(f"  Twin buffer capacity: {twin_buffer_size} (sized for initial K={initial_K_seeds})")
 
     # Proprioceptive trajectory visualization
     if variant.env == 'libero':
@@ -247,7 +249,7 @@ def main(variant):
     # ========== Double-Q Training Loop ==========
     print(f"\n{'='*60}")
     print(f"STARTING DOUBLE-Q TRAINING")
-    print(f"K_seeds: {variant.get('K_seeds', 5)}")
+    print(f"K_seeds curriculum: {variant.get('K_seeds', 8)} → {variant.get('final_K_seeds', 2)} over {variant.get('k_decay_steps', 100000)} steps")
     print(f"beta_warmup_steps: {variant.get('beta_warmup_steps', 5000)}")
     print(f"beta_max: {variant.get('beta_max', 0.5)}")
     print(f"twin_update_freq: {variant.get('twin_update_freq', 1)}")
