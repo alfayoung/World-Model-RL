@@ -462,7 +462,7 @@ def collect_traj(variant, agent, env, i, agent_dp=None, proprio_tracker=None, sa
     }
 
 def _get_libero_env(variant):
-    """Initializes and returns the LIBERO environment, along with the task description."""
+    """Initializes and returns the LIBERO environment, along with initial states."""
     benchmark_dict = benchmark.get_benchmark_dict()
     task_suite = benchmark_dict[variant.libero_suite]()
     task_id = variant.task_id
@@ -488,14 +488,16 @@ def perform_control_eval(agent, env, i, variant, wandb_logger, agent_dp=None):
     
     if 'libero' in variant.env:
         # ensure fair evaluation with fixed initial states
-        env, initial_states = _get_libero_env(variant)
+        eval_env, initial_states = _get_libero_env(variant)
+    else:
+        raise NotImplementedError()
 
     for rollout_id in range(variant.eval_episodes):
         if 'libero' in variant.env:
-            env.reset()
-            obs = env.set_init_state(initial_states[rollout_id])
+            eval_env.reset()
+            obs = eval_env.set_init_state(initial_states[rollout_id])
         elif 'aloha' in variant.env:
-            obs, _ = env.reset()
+            obs, _ = eval_env.reset()
             
         image_list = [] # for visualization
         rewards = []
@@ -536,9 +538,9 @@ def perform_control_eval(agent, env, i, variant, wandb_logger, agent_dp=None):
             action_t = actions[t % query_frequency]
             
             if 'libero' in variant.env:
-                obs, reward, done, _ = env.step(action_t)
+                obs, reward, done, _ = eval_env.step(action_t)
             elif 'aloha' in variant.env:
-                obs, reward, terminated, truncated, _ = env.step(action_t)
+                obs, reward, terminated, truncated, _ = eval_env.step(action_t)
                 done = terminated or truncated
                 
             rewards.append(reward)
