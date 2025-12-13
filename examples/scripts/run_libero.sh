@@ -1,6 +1,7 @@
 #!/bin/bash
 proj_name=DSRL_pi0_Libero
-device_id=1
+task_id=$1
+device_id=$2
 
 export DISPLAY=:0
 export MUJOCO_GL=egl
@@ -13,6 +14,7 @@ export CUDA_VISIBLE_DEVICES=$device_id
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
 
 export PYTHONPATH="/local_data/cf3331/dsrl_pi0/LIBERO:$PYTHONPATH"
+export WANDB_DIR="/local_data/cf3331/wandb_cache"
 
 pip install mujoco==3.3.1
 
@@ -20,16 +22,16 @@ python3 examples/launch_train_sim.py \
 --algorithm pixel_sac \
 --env libero \
 --libero_suite libero_90 \
---task_id 33 \
+--task_id ${task_id} \
 --prefix dsrl_pi0_libero \
 --wandb_project ${proj_name} \
 --batch_size 256 \
 --discount 0.999 \
 --seed 0 \
 --max_steps 500000  \
---eval_interval 100 \
---log_interval 50 \
---eval_episodes 10 \
+--eval_interval 10000 \
+--log_interval 500 \
+--eval_episodes 50 \
 --latent_viz_init_step 0 \
 --multi_grad_step 20 \
 --start_online_updates 500 \

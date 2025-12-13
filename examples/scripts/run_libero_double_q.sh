@@ -16,11 +16,12 @@ export PYOPENGL_PLATFORM=egl
 export MUJOCO_EGL_DEVICE_ID=$device_id
 
 export OPENPI_DATA_HOME=./openpi
-export EXP=./logs/$proj_name
+export EXP=$PWD/logs/$proj_name
 export CUDA_VISIBLE_DEVICES=$device_id
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
 
 export PYTHONPATH="/local_data/cf3331/dsrl_pi0/LIBERO:$PYTHONPATH"
+export WANDB_DIR="/local_data/cf3331/wandb_cache"
 
 pip install mujoco==3.3.1
 
@@ -73,15 +74,17 @@ else
     --max_steps 500000 \
     --eval_interval 10000 \
     --log_interval 500 \
-    --eval_episodes 10 \
+    --eval_episodes 50 \
     --checkpoint_interval 100000 \
     --multi_grad_step 20 \
     --resize_image 64 \
     --action_magnitude 1.0 \
     --query_freq 20 \
     --hidden_dims 128 \
-    --K_seeds 8 \
-    --beta_warmup_steps 10000 \
-    --beta_max 0.5 \
-    --twin_update_freq 1
+    --K_seeds 5 \
+    --final_K_seeds 1 \
+    --k_decay_steps 100000 \
+    --beta_warmup_steps 20000 \
+    --beta_max 0.6 \
+    --twin_update_freq 5
 fi
