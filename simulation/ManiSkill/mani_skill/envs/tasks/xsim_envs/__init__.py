@@ -12,3 +12,6 @@ from .render.letter_arrange_render import LetterArrangeEvalEnv
 
 from .mug_insert import MugInsertEnv
 from .render.mug_insert_render import MugInsertEvalEnv
+
+from .libero_spatial import LiberoSpatialEnv
+from .render.libero_spatial_render import LiberoSpatialEvalEnv
