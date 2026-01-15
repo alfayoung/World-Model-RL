@@ -59,7 +59,8 @@ if [ "$debug" = true ] ; then
     --beta_warmup_steps 10000 \
     --beta_max 0.5 \
     --twin_update_freq 1
-else
+elif [ $task_id = 57 ] || [ $task_id = 6 ] ; then
+    echo "Running easy tasks"
     python examples/launch_train_double_q.py \
     --algorithm twin_pixel_sac \
     --env libero \
@@ -84,7 +85,36 @@ else
     --K_seeds 5 \
     --final_K_seeds 1 \
     --k_decay_steps 100000 \
-    --beta_warmup_steps 20000 \
-    --beta_max 0.6 \
-    --twin_update_freq 5
+    --beta_warmup_steps 100000 \
+    --beta_max 1.0 \
+    --twin_update_freq 1
+else
+    echo "Running hard tasks"
+    python examples/launch_train_double_q.py \
+    --algorithm twin_pixel_sac \
+    --env libero \
+    --libero_suite libero_90 \
+    --task_id ${task_id} \
+    --prefix dsrl_double_q_libero_ablate_beta_1e5 \
+    --wandb_project ${proj_name} \
+    --batch_size 256 \
+    --start_online_updates 500 \
+    --discount 0.999 \
+    --seed 0 \
+    --max_steps 500000 \
+    --eval_interval 10000 \
+    --log_interval 500 \
+    --eval_episodes 50 \
+    --checkpoint_interval 100000 \
+    --multi_grad_step 20 \
+    --resize_image 64 \
+    --action_magnitude 1.0 \
+    --query_freq 20 \
+    --hidden_dims 128 \
+    --K_seeds 5 \
+    --final_K_seeds 1 \
+    --k_decay_steps 100000 \
+    --beta_warmup_steps 100000 \
+    --beta_max 1.0 \
+    --twin_update_freq 1
 fi

@@ -43,9 +43,6 @@ def compute_k_seeds(
     decay_steps: int = 100000,
     alpha: float = 1.0,
 ) -> int:
-    if training_step >= decay_steps:
-        return final_k
-
     progress = training_step / decay_steps
     decay = jnp.exp(-alpha * progress)
 

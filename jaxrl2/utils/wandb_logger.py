@@ -92,7 +92,6 @@ class WandBLogger(object):
             try:
                 from jaxrl2.utils.wandb_config import get_wandb_config
                 wandb_config = get_wandb_config()
-                os.environ['WANDB_API_KEY'] = wandb_config['WANDB_API_KEY']
                 os.environ['WANDB_USER_EMAIL'] = wandb_config['WANDB_EMAIL']
                 os.environ['WANDB_USERNAME'] = wandb_config['WANDB_USERNAME']
                 team = wandb_config['WANDB_TEAM'] if wandb_config['WANDB_TEAM'] != '' else None
