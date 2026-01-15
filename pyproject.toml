@@ -1,0 +1,107 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jaxrl2-vlac"
+version = "1.0.0"
+description = "JAX RL2 with VLAC: Vision-Language-Action-Critic Model for Robotic Real-World Reinforcement Learning"
+readme = "README.md"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11"
+]
+requires-python = "==3.11.11"
+dependencies = [
+    # JAX/Flax stack (from requirements.txt)
+    "jax[cuda12]==0.5.0",
+    "flax==0.10.2",
+    "distrax==0.1.5",
+    "optax==0.2.4",
+    "optree==0.15.0",
+    "orbax-checkpoint==0.11.1",
+    "ml_collections==1.0.0",
+    "ml_dtypes==0.5.1",
+
+    # PyTorch stack (from VLAC)
+    "torch==2.8.0",
+    "torchvision",
+    "timm",
+
+    # Transformers/LLM dependencies (from VLAC)
+    "ms-swift==3.3",
+    "transformers>=4.51.0",
+    "peft>=0.15.2",
+    "flash-attn",
+
+    # Diffusion models
+    "diffusers==0.33.1",
+
+    # RL environments
+    "dm-control==1.0.14",
+    "gym==0.26.2",
+    "gym-notices==0.0.8",
+    "gymnasium==1.0.0",
+    "robosuite==1.4.1",
+    "gym-aloha==0.1.1",
+    "bddl==3.5.0",
+
+    # TensorFlow (for compatibility)
+    "tensorflow==2.19.0",
+    "tf_keras==2.19.0",
+
+    # Data/visualization
+    "pandas==2.2.3",
+    "matplotlib==3.9.3",
+    "wandb[media]==0.19.9",
+    "scipy==1.15.2",
+    "h5py==3.13.0",
+
+    # Image/video processing
+    "opencv-python==4.11.0.86",
+    "pillow==10.4.0",
+    "imageio==2.37.0",
+    "moviepy==1.0.3",
+
+    # Utilities
+    "einops==0.8.1",
+    "easydict==1.13",
+    "future==1.0.0",
+    "orderly-set==5.4.0",
+    "packaging==24.2",
+    "etils==1.12.2",
+    "loguru",
+    "natsort",
+]
+
+[tool.uv.extra-build-dependencies]
+flash-attn = [{ requirement = "torch", match-runtime = true }]
+
+[tool.uv.extra-build-variables]
+flash-attn = { FLASH_ATTENTION_SKIP_CUDA_BUILD = "TRUE" }
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
+  { index = "pytorch-cu128", marker = "sys_platform == 'linux'" },
+]
+torchvision = [
+  { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
+  { index = "pytorch-cu128", marker = "sys_platform == 'linux'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.setuptools.packages.find]
+include = ["jaxrl2*", "evo_vlac*"]

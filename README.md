@@ -27,31 +27,22 @@ If you find this repository useful for your research, please cite:
 ```
 
 ## Installation
-1. Create a conda environment:
+1. Clone this repo with all submodules
 ```
-conda create -n dsrl_pi0 python=3.11.11
-conda activate dsrl_pi0
-```
-
-2. Clone this repo with all submodules
-```
-git clone git@github.com:nakamotoo/dsrl_pi0.git --recurse-submodules
-cd dsrl_pi0
+git submodule update --init --recursive
 ```
 
-3. Install all packages and dependencies
+2. Install all packages and dependencies
 ```
-pip install -e .
-pip install -r requirements.txt
-pip install "jax[cuda12]==0.5.0"
+uv pip install -e .
+uv pip install -e VLAC
 
 # install openpi
-pip install -e openpi
-pip install -e openpi/packages/openpi-client
+uv pip install -e openpi
+uv pip install -e openpi/packages/openpi-client
 
 # install Libero
-pip install -e LIBERO
-pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu # needed for libero
+uv pip install -e LIBERO
 ```
 
 ## Training (Simulation)
