@@ -8,7 +8,11 @@ proj_name=DSRL_pi0_DoubleQ_Libero
 task_id=$1
 device_id=$2
 
+echo "I am working in $PWD..."
+
 export WANDB_PROJECT=${proj_name}
+export WANDB_API_KEY="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"
+export WANDB_MODE=online
 
 export DISPLAY=:0
 export MUJOCO_GL=egl
@@ -20,8 +24,8 @@ export EXP=$PWD/logs/$proj_name
 export CUDA_VISIBLE_DEVICES=$device_id
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
 
-export PYTHONPATH="/home/ubuntu/World-Model-RL/LIBERO:$PYTHONPATH"
-export WANDB_DIR="/home/ubuntu/World-Model-RL/wandb_cache"
+export PYTHONPATH="$PWD/LIBERO:$PYTHONPATH"
+export WANDB_DIR="$PWD/wandb_cache"
 
 pip install mujoco==3.3.1
 
