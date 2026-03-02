@@ -26,21 +26,34 @@ If you find this repository useful for your research, please cite:
 }
 ```
 
-## Installation
-1. Create a conda environment:
+## UV Installation
+
+```bash
+uv pip install -e .
+
+# install openpi
+uv pip install -e openpi
+uv pip install -e openpi/packages/openpi-client
+
+# install Libero
+uv pip install -e LIBERO
 ```
+
+## Conda Installation
+1. Create a conda environment:
+```bash
 conda create -n dsrl_pi0 python=3.11.11
 conda activate dsrl_pi0
 ```
 
 2. Clone this repo with all submodules
-```
+```bash
 git clone git@github.com:nakamotoo/dsrl_pi0.git --recurse-submodules
 cd dsrl_pi0
 ```
 
 3. Install all packages and dependencies
-```
+```bash
 pip install -e .
 pip install -r requirements.txt
 pip install "jax[cuda12]==0.5.0"

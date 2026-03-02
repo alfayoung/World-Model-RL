@@ -98,7 +98,6 @@ def obs_to_qpos(obs, variant):
 
 def trajwise_alternating_training_loop(variant, agent, env, eval_env, online_replay_buffer, replay_buffer, wandb_logger,
                                        perform_control_evals=True, shard_fn=None, agent_dp=None,
-                                       canonical_mgr=None, latent_tracker=None, evolution_plotter=None,
                                        proprio_tracker=None, proprio_plotter=None):
     replay_buffer_iterator = replay_buffer.get_iterator(variant.batch_size)
     if shard_fn is not None:
@@ -162,18 +161,6 @@ def trajwise_alternating_training_loop(variant, agent, env, eval_env, online_rep
                             'is_success (exploration)': int(traj['is_success']),
                         }, i)
 
-                        # Record latent policy outputs for canonical states
-                        INIT_CANONICAL_AT_STEP = variant.latent_viz_init_step
-                        if canonical_mgr is not None and i >= INIT_CANONICAL_AT_STEP:
-                            # Initialize canonical states on first eligible step
-                            if not canonical_mgr.is_initialized:
-                                canonical_mgr.initialize(online_replay_buffer, sample_method='random')
-                                print(f"[Latent Viz] Initialized {canonical_mgr.get_num_states()} canonical states at step {i}")
-
-                            # Record latent outputs
-                            if latent_tracker is not None:
-                                latent_tracker.record_checkpoint(i, agent, canonical_mgr.get_states())
-
                     if i % variant.eval_interval == 0:
                         wandb_logger.log({'num_online_samples': len(online_replay_buffer)}, step=i)
                         wandb_logger.log({'num_online_trajs': traj_id + 1}, step=i)
@@ -182,43 +169,6 @@ def trajwise_alternating_training_loop(variant, agent, env, eval_env, online_rep
                             perform_control_eval(agent, eval_env, i, variant, wandb_logger, agent_dp)
                         if hasattr(agent, 'perform_eval'):
                             agent.perform_eval(variant, i, wandb_logger, replay_buffer, replay_buffer_iterator, eval_env)
-
-                        # Generate latent evolution visualization
-                        INIT_CANONICAL_AT_STEP = variant.latent_viz_init_step
-                        if evolution_plotter is not None and latent_tracker is not None and i >= INIT_CANONICAL_AT_STEP:
-                            if latent_tracker.get_num_checkpoints() > 0:
-                                import matplotlib.pyplot as plt
-
-                                # Generate full evolution plot (all states combined)
-                                fig_full = evolution_plotter.fit_and_plot(
-                                    latent_tracker,
-                                    current_step=i,
-                                    show_arrows=True,
-                                    show_labels=True
-                                )
-
-                                # Generate individual per-state evolution plots
-                                state_figures = evolution_plotter.plot_per_state_evolution(
-                                    latent_tracker,
-                                    current_step=i,
-                                    return_individual=True
-                                )
-
-                                # Prepare wandb log dict
-                                log_dict = {'latent_evolution/trajectory_plot': wandb.Image(fig_full)}
-                                # Add individual state plots
-                                for state_idx, fig in state_figures.items():
-                                    log_dict[f'latent_evolution/state_{state_idx}'] = wandb.Image(fig)
-
-                                # Log to wandb
-                                wandb_logger.log(log_dict, step=i)
-
-                                # Close all figures
-                                plt.close(fig_full)
-                                for fig in state_figures.values():
-                                    plt.close(fig)
-
-                                print(f"[Latent Viz] Generated evolution plots at step {i} ({len(state_figures)} individual states)")
 
                         # Generate proprioceptive trajectory visualizations
                         if proprio_tracker is not None and proprio_plotter is not None:

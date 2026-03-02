@@ -28,11 +28,7 @@ from examples.train_utils_sim import trajwise_alternating_training_loop
 import tensorflow as tf
 from jax.experimental.compilation_cache import compilation_cache
 
-# Latent policy evolution visualization
 from latent_policy_viz import (
-    CanonicalStateManager,
-    LatentPolicyTracker,
-    LatentEvolutionPlotter,
     ProprioceptiveTracker,
     ProprioceptivePlotter
 )
@@ -172,12 +168,6 @@ def main(variant):
     replay_buffer = online_replay_buffer
     replay_buffer.seed(variant.seed)
 
-    # Initialize latent policy evolution visualization
-    canonical_mgr = CanonicalStateManager(num_states=variant.get('latent_viz_num_states', 15))
-    latent_tracker = LatentPolicyTracker()
-    evolution_plotter = LatentEvolutionPlotter(method=variant.get('latent_viz_method', 'pca'))
-    print(f"Initialized latent policy visualization: {canonical_mgr.get_num_states()} states, method={variant.get('latent_viz_method', 'pca')}")
-
     # Initialize proprioceptive trajectory visualization
     # Determine end-effector indices based on environment
     if variant.env == 'libero':
@@ -198,7 +188,6 @@ def main(variant):
     trajwise_alternating_training_loop(
         variant, agent, env, eval_env, online_replay_buffer, replay_buffer, wandb_logger,
         shard_fn=shard_fn, agent_dp=agent_dp,
-        canonical_mgr=canonical_mgr, latent_tracker=latent_tracker, evolution_plotter=evolution_plotter,
         proprio_tracker=proprio_tracker, proprio_plotter=proprio_plotter
     )
  

@@ -20,8 +20,8 @@ export EXP=$PWD/logs/$proj_name
 export CUDA_VISIBLE_DEVICES=$device_id
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
 
-export PYTHONPATH="/local_data/cf3331/dsrl_pi0/LIBERO:$PYTHONPATH"
-export WANDB_DIR="/local_data/cf3331/wandb_cache"
+export PYTHONPATH="/home/ubuntu/World-Model-RL/LIBERO:$PYTHONPATH"
+export WANDB_DIR="/home/ubuntu/World-Model-RL/wandb_cache"
 
 pip install mujoco==3.3.1
 
@@ -61,7 +61,7 @@ if [ "$debug" = true ] ; then
     --twin_update_freq 1
 elif [ $task_id = 57 ] || [ $task_id = 6 ] ; then
     echo "Running easy tasks"
-    python examples/launch_train_double_q.py \
+    uv run examples/launch_train_double_q.py \
     --algorithm twin_pixel_sac \
     --env libero \
     --libero_suite libero_90 \
@@ -90,7 +90,7 @@ elif [ $task_id = 57 ] || [ $task_id = 6 ] ; then
     --twin_update_freq 1
 else
     echo "Running hard tasks"
-    python examples/launch_train_double_q.py \
+    uv run examples/launch_train_double_q.py \
     --algorithm twin_pixel_sac \
     --env libero \
     --libero_suite libero_90 \

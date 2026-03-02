@@ -31,11 +31,7 @@ from examples.train_utils_double_q import double_q_training_loop
 import tensorflow as tf
 from jax.experimental.compilation_cache import compilation_cache
 
-# Latent policy evolution visualization
 from latent_policy_viz import (
-    CanonicalStateManager,
-    LatentPolicyTracker,
-    LatentEvolutionPlotter,
     ProprioceptiveTracker,
     ProprioceptivePlotter
 )
