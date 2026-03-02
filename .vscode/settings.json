@@ -1,0 +1,9 @@
+{
+    "claudeCode.environmentVariables": [
+        {"name": "CLAUDE_CONFIG_DIR", "value": "/home/ubuntu/.claude-cunxin"}
+    ],
+    "terminal.integrated.env.linux": {
+        "CLAUDE_CONFIG_DIR": "/home/ubuntu/.claude-cunxin",
+        "CODEX_HOME": "/home/ubuntu/.codex-cunxin"
+    }
+}
