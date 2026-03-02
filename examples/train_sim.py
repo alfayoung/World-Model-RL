@@ -6,8 +6,6 @@ xla_flags += ' --xla_gpu_triton_gemm_any=True'
 os.environ['XLA_FLAGS'] = xla_flags
 
 import pathlib, copy
-from natsort import natsorted
-
 import jax
 from jaxrl2.agents.pixel_sac.pixel_sac_learner import PixelSACLearner
 from jaxrl2.utils.general_utils import add_batch_dim
@@ -77,76 +75,6 @@ class DummyEnv(gym.ObservationWrapper):
         self.action_space = Box(low=-1, high=1, shape=(1, 32,), dtype=np.float32) # 32 is the noise action space of pi 0
 
 
-def load_vlac_reference_images(ref_path):
-    """
-    Load reference images for VLAC from directory or file list.
-
-    Args:
-        ref_path: Directory path, .txt file with paths, or comma-separated paths
-    Returns:
-        List of PIL Image objects
-    """
-    import PIL.Image
-    import glob
-
-    ref_images = []
-
-    if os.path.isdir(ref_path):
-        # Load all images from directory, sorted
-        image_files = natsorted(
-            glob.glob(os.path.join(ref_path, '*.jpg')) +
-            glob.glob(os.path.join(ref_path, '*.png')) +
-            glob.glob(os.path.join(ref_path, '*.jpeg'))
-        )
-        for img_path in image_files:
-            ref_images.append(PIL.Image.open(img_path))
-        print(f'Loaded {len(ref_images)} reference images from directory: {ref_path}')
-
-    elif os.path.isfile(ref_path) and ref_path.endswith('.txt'):
-        # Load paths from text file
-        with open(ref_path, 'r') as f:
-            image_paths = [line.strip() for line in f if line.strip()]
-        for img_path in image_paths:
-            if os.path.exists(img_path):
-                ref_images.append(PIL.Image.open(img_path))
-            else:
-                print(f'Warning: Reference image not found: {img_path}')
-        print(f'Loaded {len(ref_images)} reference images from file list: {ref_path}')
-
-    elif ',' in ref_path:
-        # Comma-separated paths
-        image_paths = [p.strip() for p in ref_path.split(',')]
-        for img_path in image_paths:
-            if os.path.exists(img_path):
-                ref_images.append(PIL.Image.open(img_path))
-            else:
-                print(f'Warning: Reference image not found: {img_path}')
-        print(f'Loaded {len(ref_images)} reference images from comma-separated list')
-    else:
-        raise ValueError(f'Invalid reference path: {ref_path}')
-
-    if not ref_images:
-        raise ValueError(f'No reference images loaded from: {ref_path}')
-
-    return ref_images
-
-
-def validate_vlac_config(variant):
-    """Validate VLAC configuration before training."""
-    if variant.use_vlac_rewards:
-        if not variant.vlac_model_path:
-            raise ValueError('--vlac_model_path is required when --use_vlac_rewards=1')
-        if not os.path.exists(variant.vlac_model_path):
-            raise ValueError(f'VLAC model path does not exist: {variant.vlac_model_path}')
-
-        if variant.vlac_ref_images_path and not os.path.exists(variant.vlac_ref_images_path):
-            raise ValueError(f'VLAC reference path does not exist: {variant.vlac_ref_images_path}')
-        elif not variant.vlac_ref_images_path:
-            print('Warning: No reference images provided. VLAC will work but may be less accurate.')
-
-        print('VLAC configuration validated successfully')
-
-
 def main(variant):
     devices = jax.local_devices()
     num_devices = len(devices)
@@ -202,9 +130,6 @@ def main(variant):
         variant.env_max_reward = 4
         variant.max_timesteps = 400
 
-    # Validate VLAC configuration
-    validate_vlac_config(variant)
-
     group_name = variant.prefix + '_' + variant.launch_group_id
     wandb_output_dir = os.environ.get('WANDB_DIR', tempfile.mkdtemp())
     wandb_logger = WandBLogger(variant.prefix != '', variant, variant.wandb_project, experiment_id=expname, output_dir=wandb_output_dir, group_name=group_name)
@@ -228,31 +153,6 @@ def main(variant):
     print("Loaded pi0 policy from %s", checkpoint_dir)
     agent = PixelSACLearner(variant.seed, sample_obs, sample_action, **kwargs)
 
-    # Initialize VLAC critic model if enabled
-    vlac_critic = None
-    vlac_ref_images = None
-    if variant.use_vlac_rewards:
-        from evo_vlac import GAC_model
-        print('Initializing VLAC Critic model...')
-
-        vlac_critic = GAC_model(tag='critic')
-        vlac_critic.init_model(
-            model_path=variant.vlac_model_path,
-            model_type='internvl2',
-            device_map=f'cuda:{variant.vlac_device}'
-        )
-        vlac_critic.temperature = variant.vlac_temperature
-        vlac_critic.top_k = variant.vlac_top_k
-        vlac_critic.set_config()
-        vlac_critic.set_system_prompt()
-
-        # Load reference images once
-        if variant.vlac_ref_images_path:
-            vlac_ref_images = load_vlac_reference_images(variant.vlac_ref_images_path)
-            print(f'Loaded {len(vlac_ref_images)} reference images for VLAC')
-
-        print('VLAC Critic model initialized successfully')
-
     online_buffer_size = variant.max_steps  // variant.multi_grad_step
     online_replay_buffer = ReplayBuffer(dummy_env.observation_space, dummy_env.action_space, int(online_buffer_size))
     replay_buffer = online_replay_buffer
@@ -263,7 +163,6 @@ def main(variant):
     trajwise_alternating_training_loop(
         variant, agent, env, eval_env, online_replay_buffer, replay_buffer,
         wandb_logger, shard_fn=shard_fn, agent_dp=agent_dp,
-        vlac_critic=vlac_critic, vlac_ref_images=vlac_ref_images,
         save_video=variant.save_video, video_base_dir=video_base_dir
     )
  

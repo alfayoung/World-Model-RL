@@ -35,7 +35,6 @@ git submodule update --init --recursive
 2. Install all packages and dependencies
 ```
 uv pip install -e .
-uv pip install -e VLAC
 
 # install openpi
 uv pip install -e openpi

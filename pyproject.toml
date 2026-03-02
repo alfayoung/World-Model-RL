@@ -3,9 +3,9 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "jaxrl2-vlac"
+name = "jaxrl2"
 version = "1.0.0"
-description = "JAX RL2 with VLAC: Vision-Language-Action-Critic Model for Robotic Real-World Reinforcement Learning"
+description = "JAX RL2: Diffusion Steering via Reinforcement Learning"
 readme = "README.md"
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -25,17 +25,6 @@ dependencies = [
     "orbax-checkpoint==0.11.1",
     "ml_collections==1.0.0",
     "ml_dtypes==0.5.1",
-
-    # PyTorch stack (from VLAC)
-    "torch==2.8.0",
-    "torchvision",
-    "timm",
-
-    # Transformers/LLM dependencies (from VLAC)
-    "ms-swift==3.3",
-    "transformers>=4.51.0",
-    "peft>=0.15.2",
-    "flash-attn",
 
     # Diffusion models
     "diffusers==0.33.1",
@@ -77,31 +66,5 @@ dependencies = [
     "natsort",
 ]
 
-[tool.uv.extra-build-dependencies]
-flash-attn = [{ requirement = "torch", match-runtime = true }]
-
-[tool.uv.extra-build-variables]
-flash-attn = { FLASH_ATTENTION_SKIP_CUDA_BUILD = "TRUE" }
-
-[tool.uv.sources]
-torch = [
-  { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
-  { index = "pytorch-cu128", marker = "sys_platform == 'linux'" },
-]
-torchvision = [
-  { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
-  { index = "pytorch-cu128", marker = "sys_platform == 'linux'" },
-]
-
-[[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-explicit = true
-
-[[tool.uv.index]]
-name = "pytorch-cu128"
-url = "https://download.pytorch.org/whl/cu128"
-explicit = true
-
 [tool.setuptools.packages.find]
-include = ["jaxrl2*", "evo_vlac*"]
+include = ["jaxrl2*"]

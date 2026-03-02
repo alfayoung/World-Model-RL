@@ -129,6 +129,3 @@ tmp/
 wandb_config.py
 logs/
 wandb/
-
-# VLAC Reference images
-ref_img/

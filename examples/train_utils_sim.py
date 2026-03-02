@@ -9,8 +9,6 @@ import math
 import PIL
 import imageio
 
-from VLAC.evo_vlac.utils.video_tool import video_trajectory
-
 from libero.libero import benchmark
 from libero.libero import get_libero_path
 from libero.libero.envs import OffScreenRenderEnv
@@ -45,22 +43,6 @@ def obs_to_img(obs, variant):
     if variant.resize_image > 0:
         curr_image = np.array(PIL.Image.fromarray(curr_image).resize((variant.resize_image, variant.resize_image)))
     return curr_image
-
-def numpy_images_to_pil(image_list):
-    """
-    Convert list of numpy arrays to PIL Images for VLAC.
-    VLAC will automatically resize these to 448x448.
-
-    Args:
-        image_list: List of numpy arrays (H, W, 3), dtype uint8
-    Returns:
-        List of PIL.Image objects
-    """
-    pil_images = []
-    for img_array in image_list:
-        pil_img = PIL.Image.fromarray(img_array)
-        pil_images.append(pil_img)
-    return pil_images
 
 def obs_to_pi_zero_input(obs, variant):
     if variant.env == 'libero':
@@ -115,7 +97,6 @@ def obs_to_qpos(obs, variant):
 
 def trajwise_alternating_training_loop(variant, agent, env, eval_env, online_replay_buffer, replay_buffer, wandb_logger,
                                        perform_control_evals=True, shard_fn=None, agent_dp=None,
-                                       vlac_critic=None, vlac_ref_images=None,
                                        save_video=False, video_base_dir=None):
     replay_buffer_iterator = replay_buffer.get_iterator(variant.batch_size)
     if shard_fn is not None:
@@ -133,7 +114,7 @@ def trajwise_alternating_training_loop(variant, agent, env, eval_env, online_rep
     with tqdm(total=variant.max_steps, initial=0) as pbar:
         while i <= variant.max_steps:
             traj = collect_traj(
-                variant, agent, env, i, agent_dp, vlac_critic, vlac_ref_images,
+                variant, agent, env, i, agent_dp,
                 save_video=save_video,
                 video_base_dir=video_base_dir,
                 episode=traj_count
@@ -226,7 +207,7 @@ def add_online_data_to_buffer(variant, traj, online_replay_buffer):
         online_replay_buffer.insert(insert_dict)
     online_replay_buffer.increment_traj_counter()
 
-def collect_traj(variant, agent, env, i, agent_dp=None, vlac_critic=None, vlac_ref_images=None,
+def collect_traj(variant, agent, env, i, agent_dp=None,
                  save_video=False, video_base_dir=None, episode=None):
     query_frequency = variant.query_freq
     max_timesteps = variant.max_timesteps
@@ -240,7 +221,6 @@ def collect_traj(variant, agent, env, i, agent_dp=None, vlac_critic=None, vlac_r
         obs, _ = env.reset()
     
     image_list = [] # for visualization
-    vlac_iamge_list = [] # for vlac reward computation
     rewards = []
     action_list = []
     obs_list = []
@@ -261,8 +241,6 @@ def collect_traj(variant, agent, env, i, agent_dp=None, vlac_critic=None, vlac_r
             }
 
         if t % query_frequency == 0:
-            vlac_iamge_list.append(curr_image) # register VLAC image
-
             assert agent_dp is not None
             # we then use the noise to sample the action from diffusion model
             rng, key = jax.random.split(rng)
@@ -296,51 +274,16 @@ def collect_traj(variant, agent, env, i, agent_dp=None, vlac_critic=None, vlac_r
         if done:
             break
 
-    vlac_iamge_list.append(curr_image)
-
-    # Initialize VLAC variables for potential visualization
-    critic_list = None
-    value_list = None
-    pil_images = None
-
-    if variant.use_vlac_rewards and vlac_critic is not None:
-        # Compute dense rewards using VLAC if enabled
-
-        # Convert numpy images to PIL format for VLAC
-        pil_images = numpy_images_to_pil(vlac_iamge_list)
-
-        # Compute VLAC critic and value lists
-        critic_list, value_list = vlac_critic.get_trajectory_critic(
-            task=variant.task_description,
-            image_list=pil_images,
-            ref_image_list=vlac_ref_images,
-            batch_num=variant.vlac_batch_num,
-            ref_num=6 if vlac_ref_images else 0,
-            rich=False,
-            reverse_eval=False,
-        )
-
-        # Convert value_list (0-100 scale) to 0-1 scale
-        # This gives per-timestep progress rewards
-        vlac_rewards = [v / 100.0 for v in value_list]
-        if rewards[-1] == 1: # Ensure final reward matches env reward if successful
-            vlac_rewards[-1] = rewards[-1]
-
-        dense_rewards = np.array(vlac_rewards[1:]) - np.array(vlac_rewards[:-1])
-        assert len(dense_rewards) == len(action_list), f'Dense rewards length {len(dense_rewards)} does not match action list length {len(action_list)}'
-        rewards = dense_rewards
-        print(f'VLAC rewards: {dense_rewards}')
+    '''
+    We use sparse -1/0 reward to train the SAC agent.
+    '''
+    is_success = (reward == env_max_reward)
+    if is_success:
+        query_steps = len(action_list)
+        rewards = np.concatenate([-np.ones(query_steps - 1), [0]])
     else:
-        '''
-        We use sparse -1/0 reward to train the SAC agent.
-        '''
-        is_success = (reward == env_max_reward)
-        if is_success:
-            query_steps = len(action_list)
-            rewards = np.concatenate([-np.ones(query_steps - 1), [0]])
-        else:
-            query_steps = len(action_list)
-            rewards = -np.ones(query_steps)
+        query_steps = len(action_list)
+        rewards = -np.ones(query_steps)
 
     # add last observation
     curr_image = obs_to_img(obs, variant)
@@ -372,33 +315,11 @@ def collect_traj(variant, agent, env, i, agent_dp=None, vlac_critic=None, vlac_r
         else:
             video_filename = f"step_{i}_ret_{episode_return:.2f}_{success_tag}.mp4"
 
-        # If VLAC rewards are computed, use video_trajectory for rich visualization
-        if value_list is not None and pil_images is not None:
-            # Use video_trajectory for visualization with rewards paired with images
-            traj_id = f"ep_{episode}" if episode is not None else f"step_{i}"
-            video_trajectory(
-                traj_id=traj_id,
-                view=success_tag,
-                image_paths=[],  # We use image_objects instead
-                image_objects=pil_images,
-                done_list=[1 if is_success else 0] * len(value_list),  # Done status for each step
-                critic_list=rewards.tolist(),
-                value_list=np.cumsum(rewards).tolist(),
-                task=variant.task_description,
-                output_path=str(video_subdir),
-                fps=5,
-                ref_image_paths=vlac_ref_images,
-                n_num=6,
-                critic_log_scale=False,
-            )
-            print(f"[DEBUG] VLAC trajectory video saved to: {video_subdir}")
-        else:
-            # Fallback to simple video using imageio
-            video_path = video_subdir / video_filename
-            print(f"[DEBUG] Saving trajectory video to: {video_path}")
-            images_uint8 = [img.astype(np.uint8) for img in image_list]
-            imageio.mimsave(str(video_path), images_uint8, fps=20)
-            print(f"[DEBUG] Video saved successfully: {video_path}")
+        video_path = video_subdir / video_filename
+        print(f"[DEBUG] Saving trajectory video to: {video_path}")
+        images_uint8 = [img.astype(np.uint8) for img in image_list]
+        imageio.mimsave(str(video_path), images_uint8, fps=20)
+        print(f"[DEBUG] Video saved successfully: {video_path}")
 
     print(f'Rollout Done: {episode_return=}, Success: {is_success}')
     
