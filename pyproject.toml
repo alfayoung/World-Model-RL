@@ -25,13 +25,10 @@ dependencies = [
     "orbax-checkpoint==0.11.1",
     "ml_collections==1.0.0",
     "ml_dtypes==0.5.1",
-
     # PyTorch stack
     "torch==2.8.0",
-
     # Diffusion models
     "diffusers==0.33.1",
-
     # RL environments
     "dm-control==1.0.14",
     "gym==0.26.2",
@@ -40,24 +37,20 @@ dependencies = [
     "robosuite==1.4.1",
     "gym-aloha==0.1.1",
     "bddl==3.5.0",
-
     # TensorFlow (for compatibility)
     "tensorflow==2.19.0",
     "tf_keras==2.19.0",
-
     # Data/visualization
     "pandas==2.2.3",
     "matplotlib==3.9.3",
     "wandb[media]==0.19.9",
     "scipy==1.15.2",
     "h5py==3.13.0",
-
     # Image/video processing
     "opencv-python==4.11.0.86",
     "pillow==10.4.0",
     "imageio==2.37.0",
     "moviepy==1.0.3",
-
     # Utilities
     "einops==0.8.1",
     "easydict==1.13",
@@ -67,7 +60,33 @@ dependencies = [
     "etils==1.12.2",
     "loguru",
     "natsort",
+    # Openpi
+    "openpi-client",
+    "scikit-learn>=1.8.0",
+    "tyro>=1.0.8",
+    "augmax>=0.3.4",
+    "dm-tree>=0.1.8",
+    "equinox>=0.11.8",
+    "flatbuffers>=24.3.25",
+    "fsspec[gcs]>=2024.6.0",
+    "jaxtyping==0.2.36",
+    "numpydantic>=1.6.6",
+    "s3fs>=2024.9.0",
+    "sentencepiece>=0.2.0",
+    "tqdm-loggable>=0.2",
+    "typing-extensions>=4.12.2",
+    "boto3>=1.35.7",
+    "types-boto3[boto3,s3]>=1.35.7",
+    "filelock>=3.16.1",
+    "beartype>=0.19.0",
+    "treescope>=0.1.7",
+    "transformers==4.48.1",
 ]
+
+# Fix mujoco 2.3.7 Python binding bug: MjvOption.geomgroup has strides=(0,),
+# making all array elements alias the same memory byte. Fixed in 3.1.4+.
+[tool.uv]
+override-dependencies = ["mujoco>=3.1.4"]
 
 [tool.uv.extra-build-dependencies]
 flash-attn = [{ requirement = "torch", match-runtime = true }]
@@ -84,6 +103,7 @@ torchvision = [
   { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
   { index = "pytorch-cu128", marker = "sys_platform == 'linux'" },
 ]
+openpi-client = { workspace = true, editable = true }
 
 [[tool.uv.index]]
 name = "pytorch-cpu"
@@ -94,6 +114,11 @@ explicit = true
 name = "pytorch-cu128"
 url = "https://download.pytorch.org/whl/cu128"
 explicit = true
+
+[tool.uv.workspace]
+members = [
+    "openpi/packages/openpi-client",
+]
 
 [tool.setuptools.packages.find]
 include = ["jaxrl2*", "evo_vlac*"]
