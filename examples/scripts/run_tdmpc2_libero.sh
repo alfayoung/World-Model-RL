@@ -13,13 +13,8 @@ export MUJOCO_EGL_DEVICE_ID=$device_id
 
 export EXP=./logs/$proj_name
 export CUDA_VISIBLE_DEVICES=$device_id
-export PYTHONPATH="/opt/dlami/nvme/cunxin/World-Model-RL-env/third_party/LIBERO:${PYTHONPATH}"
-# tdmpc2 module lives in the worktree root
-export PYTHONPATH="$(pwd):${PYTHONPATH}"
 
-PYTHON=/home/ubuntu/miniconda3/envs/xsim/bin/python
-
-$PYTHON examples/launch_train_tdmpc2.py \
+uv run python examples/launch_train_tdmpc2.py \
     --env libero \
     --libero_suite libero_90 \
     --task_id ${task_id} \
