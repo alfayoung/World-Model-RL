@@ -1,3 +1,6 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
-setup(name="jaxrl2", packages=["jaxrl2"])
+setup(
+    name="jaxrl2",
+    packages=find_packages(include=["jaxrl2*", "dreamer_v3*"]),
+)
