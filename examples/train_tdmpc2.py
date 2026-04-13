@@ -57,19 +57,22 @@ def _preprocess_obs(raw_obs: dict, variant: dict) -> dict:
 
 @torch.no_grad()
 def evaluate(agent: TDMPC2Agent, env, variant: dict, num_episodes: int) -> dict:
+    max_ep_steps = variant.get('max_ep_steps', 600)
     successes, ep_returns = [], []
     for _ in range(num_episodes):
         raw_obs = env.reset()
         obs = _preprocess_obs(raw_obs, variant)
         done = False
         ep_ret = 0.0
+        ep_step = 0
         prev_mean = None
-        while not done:
+        while not done and ep_step < max_ep_steps:
             action, prev_mean = agent.select_action(obs, eval_mode=True, prev_mean=prev_mean)
             raw_obs, reward, done, info = env.step(action)
             obs = _preprocess_obs(raw_obs, variant)
             ep_ret += reward
-        successes.append(float(info.get('success', 0.0)))
+            ep_step += 1
+        successes.append(float(env.check_success()))
         ep_returns.append(ep_ret)
     return {
         'eval/success_rate': float(np.mean(successes)),
@@ -107,7 +110,9 @@ def main(variant: dict):
     if variant.get('add_states', True):
         state_dim = 9               # eef_pos(3) + eef_quat(4) + gripper(2)
 
-    action_dim = env.action_space.shape[0]
+    # OffScreenRenderEnv uses robosuite's action_spec (accessed via inner env)
+    action_low, _ = env.env.action_spec
+    action_dim = action_low.shape[0]
     obs_space = {'pixels': (h, w, c)}
     if state_dim > 0:
         obs_space['state'] = (state_dim,)
@@ -167,6 +172,7 @@ def main(variant: dict):
     log_interval = variant.get('log_interval', 500)
     eval_episodes = variant.get('eval_episodes', 10)
     query_freq = variant.get('query_freq', 1)  # env steps per action
+    max_ep_steps = variant.get('max_ep_steps', 600)  # LIBERO episode horizon
 
     raw_obs = env.reset()
     obs = _preprocess_obs(raw_obs, variant)
@@ -177,7 +183,7 @@ def main(variant: dict):
     for global_step in range(1, max_steps + 1):
         # ---------- Collect one transition -----------------------------------
         if global_step < start_updates:
-            action = env.action_space.sample()
+            action = np.random.uniform(-1.0, 1.0, size=(action_dim,)).astype(np.float32)
             prev_mean = None
         else:
             if ep_step % query_freq == 0:
@@ -190,7 +196,7 @@ def main(variant: dict):
         ep_ret += reward
         ep_step += 1
 
-        if done:
+        if done or ep_step >= max_ep_steps:
             raw_obs = env.reset()
             obs = _preprocess_obs(raw_obs, variant)
             prev_mean = None
