@@ -19,6 +19,9 @@ class WandBLogger:
             return
         try:
             import wandb
+            # Fall back to offline mode if no API key is available (avoids blocking)
+            if not os.environ.get('WANDB_API_KEY') and not wandb.api.api_key:
+                os.environ.setdefault('WANDB_MODE', 'offline')
             wandb.init(
                 project=project,
                 name=name,
@@ -28,6 +31,7 @@ class WandBLogger:
                 reinit=True,
             )
             self._wandb = wandb
+            print(f'[WandBLogger] mode={wandb.run.settings.mode}')
         except Exception as e:
             print(f'[WandBLogger] WandB init failed: {e}. Logging disabled.')
             self.enabled = False
