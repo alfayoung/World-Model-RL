@@ -28,6 +28,7 @@ import numpy as np
 import torch
 from libero.libero import benchmark, get_libero_path
 from libero.libero.envs import OffScreenRenderEnv
+from scipy.spatial.transform import Rotation
 
 
 def euler2quat(euler):
@@ -146,6 +147,39 @@ def set_seed_everywhere(seed: int):
     random.seed(seed)
 
 
+def construct_camera_intrinsics_sim(env, camera_name: str):
+    """Read simulator-true pinhole intrinsics from MuJoCo camera FOV."""
+    cam_id = env.sim.model.camera_name2id(camera_name)
+    fovy = env.sim.model.cam_fovy[cam_id]
+    width, height = env.env.camera_widths[0], env.env.camera_heights[0]
+    f = 0.5 * height / np.tan(np.deg2rad(fovy) / 2)
+    cx = width / 2
+    cy = height / 2
+    return np.array([[f, 0, cx], [0, f, cy], [0, 0, 1]], dtype=np.float64), int(width), int(height)
+
+
+def get_camera_pose_world_and_world_to_cam(env, camera_name: str):
+    """Get camera world pose and world->camera transform in OpenCV convention."""
+    cam_id = env.sim.model.camera_name2id(camera_name)
+    cam_pos = env.sim.data.cam_xpos[cam_id].copy()
+    cam_mat = env.sim.data.cam_xmat[cam_id].reshape(3, 3).copy()
+
+    mujoco_to_opencv = np.array(
+        [
+            [1, 0, 0],
+            [0, -1, 0],
+            [0, 0, -1],
+        ],
+        dtype=np.float64,
+    )
+    cam_rot_opencv = cam_mat @ mujoco_to_opencv
+
+    T_world_to_cam = np.eye(4, dtype=np.float64)
+    T_world_to_cam[:3, :3] = cam_rot_opencv.T
+    T_world_to_cam[:3, 3] = -cam_rot_opencv.T @ cam_pos
+    return cam_pos, cam_mat, T_world_to_cam
+
+
 # Define task suite constants
 class TaskSuite(str, Enum):
     LIBERO_SPATIAL = "libero_spatial"
@@ -219,10 +253,8 @@ def set_camera_pose(env, camera_name: str, pos, quat_wxyz):
 
 def render_view(env, camera_name: str, resolution: int):
     """Render a view from a specific camera."""
-    # robosuite render returns a flipped image, so we flip it back.
-    return env.sim.render(camera_name=camera_name, height=resolution, width=resolution)[
-        ::-1, ::-1
-    ]
+    # MuJoCo / LIBERO renders arrive vertically flipped in image space.
+    return env.sim.render(camera_name=camera_name, height=resolution, width=resolution)[::-1]
 
 def get_key():
     """Read a single keypress without waiting for ENTER."""
@@ -258,43 +290,72 @@ def print_controls(recording_enabled=False, move_count=0, record_interval=5):
     print("---" * 10)
     print("\nPress any key (no ENTER needed)...")
 
-def export_camera_poses_colmap(output_dir: str, camera_data: list, resolution: int):
-    """
-    Export camera poses in COLMAP format for SfM reconstruction.
+def export_camera_poses_colmap(output_dir: str, camera_data: list, resolution: int, K=None, width=None, height=None):
+    """Export camera intrinsics/extrinsics in COLMAP text format.
 
-    Args:
-        output_dir: Directory to save camera poses
-        camera_data: List of dicts with 'filename', 'position', 'quaternion'
-        resolution: Image resolution (assumes square images)
+    Preferred camera_data entry keys (new path):
+      - filename
+      - q_wxyz  (world->camera quaternion in OpenCV frame)
+      - t_wc    (world->camera translation in OpenCV frame)
+      - T_world_to_cam_opencv_4x4
+
+    Legacy fallback keys (kept for backward compatibility):
+      - quaternion, position
     """
     import json
 
-    # Create cameras.txt (intrinsics)
-    cameras_file = os.path.join(output_dir, "cameras.txt")
-    with open(cameras_file, 'w') as f:
-        f.write("# Camera list with one line of data per camera:\n")
-        f.write("#   CAMERA_ID, MODEL, WIDTH, HEIGHT, PARAMS[]\n")
-        # Fixme: Assuming pinhole camera model with focal length ~0.7*resolution
+    if K is None:
         focal = 0.7 * resolution
         cx, cy = resolution / 2, resolution / 2
-        f.write(f"1 PINHOLE {resolution} {resolution} {focal} {focal} {cx} {cy}\n")
+        K = np.array([[focal, 0, cx], [0, focal, cy], [0, 0, 1]], dtype=np.float64)
+        width = int(resolution)
+        height = int(resolution)
+    else:
+        K = np.asarray(K, dtype=np.float64)
+        if width is None:
+            width = int(resolution)
+        if height is None:
+            height = int(resolution)
 
-    # Create images.txt (extrinsics)
+    fx, fy = float(K[0, 0]), float(K[1, 1])
+    cx, cy = float(K[0, 2]), float(K[1, 2])
+
+    cameras_file = os.path.join(output_dir, "cameras.txt")
+    with open(cameras_file, "w", encoding="utf-8") as f:
+        f.write("# Camera list with one line of data per camera:\n")
+        f.write("#   CAMERA_ID, MODEL, WIDTH, HEIGHT, PARAMS[]\n")
+        f.write(f"1 PINHOLE {width} {height} {fx} {fy} {cx} {cy}\n")
+
     images_file = os.path.join(output_dir, "images.txt")
-    with open(images_file, 'w') as f:
+    json_rows = []
+    with open(images_file, "w", encoding="utf-8") as f:
         f.write("# Image list with two lines of data per image:\n")
         f.write("#   IMAGE_ID, QW, QX, QY, QZ, TX, TY, TZ, CAMERA_ID, NAME\n")
         f.write("#   POINTS2D[] as (X, Y, POINT3D_ID)\n")
         for idx, cam in enumerate(camera_data, start=1):
-            quat = cam['quaternion']  # [w, x, y, z]
-            pos = cam['position']
-            f.write(f"{idx} {quat[0]} {quat[1]} {quat[2]} {quat[3]} {pos[0]} {pos[1]} {pos[2]} 1 {cam['filename']}\n")
-            f.write("\n")  # Empty line for POINTS2D
+            if "q_wxyz" in cam and "t_wc" in cam:
+                q = np.asarray(cam["q_wxyz"], dtype=np.float64)
+                t = np.asarray(cam["t_wc"], dtype=np.float64)
+            else:
+                q = np.asarray(cam["quaternion"], dtype=np.float64)
+                t = np.asarray(cam["position"], dtype=np.float64)
 
-    # Also save as JSON for easier parsing
+            f.write(f"{idx} {q[0]} {q[1]} {q[2]} {q[3]} {t[0]} {t[1]} {t[2]} 1 {cam['filename']}\n")
+            f.write("\n")
+
+            row = {
+                "image_id": idx,
+                "filename": cam["filename"],
+                "q_wxyz": q.tolist(),
+                "t_wc": t.tolist(),
+            }
+            if "T_world_to_cam_opencv_4x4" in cam:
+                row["T_world_to_cam_opencv_4x4"] = np.asarray(cam["T_world_to_cam_opencv_4x4"], dtype=np.float64).tolist()
+            json_rows.append(row)
+
     json_file = os.path.join(output_dir, "camera_poses.json")
-    with open(json_file, 'w') as f:
-        json.dump(camera_data, f, indent=2, default=lambda x: x.tolist() if isinstance(x, np.ndarray) else x)
+    with open(json_file, "w", encoding="utf-8") as f:
+        json.dump(json_rows, f, indent=2)
 
     print(f"Exported camera poses to {cameras_file}, {images_file}, and {json_file}")
 
@@ -479,9 +540,18 @@ def capture_panoramic_sweep(env, cfg: InteractiveConfig):
                     filepath = os.path.join(cfg.output_dir, filename)
                     imageio.imwrite(filepath, img)
 
-                    # Store camera data for export
+                    # Store camera data for export using simulator GT world->camera OpenCV pose
+                    _, _, T_world_to_cam = get_camera_pose_world_and_world_to_cam(env, cfg.camera_name)
+                    R_wc = T_world_to_cam[:3, :3]
+                    t_wc = T_world_to_cam[:3, 3]
+                    q_xyzw = Rotation.from_matrix(R_wc).as_quat()
+                    q_wxyz = [float(q_xyzw[3]), float(q_xyzw[0]), float(q_xyzw[1]), float(q_xyzw[2])]
+
                     camera_data.append({
                         'filename': filename,
+                        'q_wxyz': q_wxyz,
+                        't_wc': t_wc.tolist(),
+                        'T_world_to_cam_opencv_4x4': T_world_to_cam.tolist(),
                         'position': new_pos.copy(),
                         'quaternion': new_quat.copy(),
                         'radius_multiplier': radius_mult,
@@ -498,7 +568,8 @@ def capture_panoramic_sweep(env, cfg: InteractiveConfig):
 
     # Export camera poses if requested
     if cfg.export_camera_poses:
-        export_camera_poses_colmap(cfg.output_dir, camera_data, cfg.env_img_res)
+        K, width, height = construct_camera_intrinsics_sim(env, cfg.camera_name)
+        export_camera_poses_colmap(cfg.output_dir, camera_data, cfg.env_img_res, K=K, width=width, height=height)
 
     # Restore initial pose
     set_camera_pose(env, cfg.camera_name, initial_pos, initial_quat)
@@ -588,7 +659,8 @@ def interactive_camera_controller(cfg: InteractiveConfig):
             # Save recorded frames if any
             if recording_enabled and recorded_frames and cfg.export_camera_poses:
                 print(f"\nExporting {len(recorded_frames)} recorded camera poses...")
-                export_camera_poses_colmap(cfg.output_dir, recorded_frames, cfg.env_img_res)
+                K, width, height = construct_camera_intrinsics_sim(env, cfg.camera_name)
+                export_camera_poses_colmap(cfg.output_dir, recorded_frames, cfg.env_img_res, K=K, width=width, height=height)
             break
         if cmd == "p":
             continue
@@ -678,9 +750,18 @@ def interactive_camera_controller(cfg: InteractiveConfig):
                 filepath = os.path.join(cfg.output_dir, filename)
                 imageio.imwrite(filepath, recorded_img)
 
-                # Store camera data
+                # Store camera data (simulator GT world->camera OpenCV pose)
+                _, _, T_world_to_cam = get_camera_pose_world_and_world_to_cam(env, cfg.camera_name)
+                R_wc = T_world_to_cam[:3, :3]
+                t_wc = T_world_to_cam[:3, 3]
+                q_xyzw = Rotation.from_matrix(R_wc).as_quat()
+                q_wxyz = [float(q_xyzw[3]), float(q_xyzw[0]), float(q_xyzw[1]), float(q_xyzw[2])]
+
                 recorded_frames.append({
                     'filename': filename,
+                    'q_wxyz': q_wxyz,
+                    't_wc': t_wc.tolist(),
+                    'T_world_to_cam_opencv_4x4': T_world_to_cam.tolist(),
                     'position': new_pos.copy(),
                     'quaternion': new_quat_wxyz.copy(),
                     'move_count': move_count
