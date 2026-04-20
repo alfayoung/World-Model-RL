@@ -1,0 +1,9 @@
+- task=libero-90-57
+- seed=1
+- steps=1100
+- eval_freq=1000
+- eval_episodes=1
+- save_video=false
+- save_agent=false
+- enable_wandb=false
+- work_dir=/tmp/tdmpc2_smoke

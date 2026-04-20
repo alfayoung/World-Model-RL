@@ -20,22 +20,28 @@ dependencies = [
     "bddl==3.5.0",
     "mujoco>=3.1.4",
     # Data / numerics
-    "numpy==1.26.4",
+    "numpy>=1.24.0",
     "scipy>=1.10.0",
     "h5py>=3.7.0",
-    # Image / video
-    "opencv-python>=4.6.0",
-    "pillow>=9.0.0",
-    "imageio>=2.22.0",
+    # TD-MPC2 core dependencies
+    "hydra-core==1.3.2",
+    "hydra-submitit-launcher==1.2.0",
+    "omegaconf==2.3.0",
+    "submitit==1.5.1",
+    "tensordict>=0.6.0",
+    "torchrl>=0.6.0",
+    "kornia>=0.7.0",
     # Logging
-    "wandb>=0.16.0",
+    "wandb>=0.17.0",
+    "pandas>=2.0.0",
     # Utilities
-    "einops>=0.6.0",
-    "easydict>=1.9",
     "tqdm>=4.64.0",
-    "termcolor>=3.3.0",
+    "termcolor>=2.4.0",
     "cloudpickle>=3.1.2",
-    "matplotlib>=3.10.8",
+    "matplotlib>=3.5.0",
+    "imageio>=2.22.0",
+    "imageio-ffmpeg>=0.4.9",
+    "easydict>=1.13",
 ]
 
 [tool.uv]

@@ -28,15 +28,43 @@ If you find this repository useful for your research, please cite:
 
 ## UV Installation
 
+This repo includes a `pyproject.toml` and `uv.lock`, so the recommended setup is:
+
 ```bash
-uv pip install -e .
+git clone <repo-url>
+cd World-Model-RL-tdmpc2
 
-# install openpi
-uv pip install -e openpi
-uv pip install -e openpi/packages/openpi-client
+# optional, if you do not already have uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# install Libero
-uv pip install -e LIBERO
+# create/update .venv from the locked environment
+uv sync
+```
+
+Notes:
+
+- `uv sync` uses the local editable LIBERO source configured in `pyproject.toml`.
+- The current training code expects Python `3.10`.
+- If you want to use a different GPU, set `CUDA_VISIBLE_DEVICES` before launching. `run_task57.sh` will automatically mirror the first visible GPU into `MUJOCO_EGL_DEVICE_ID`.
+
+## Run LIBERO Task 57
+
+The repository includes a helper launcher for TD-MPC2 on LIBERO-90 task 57:
+
+```bash
+bash run_task57.sh
+```
+
+To choose a seed explicitly:
+
+```bash
+bash run_task57.sh 3
+```
+
+By default logs are written under:
+
+```bash
+logs/tdmpc2_task57_seed<SEED>
 ```
 
 ## Conda Installation
