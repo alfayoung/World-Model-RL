@@ -3,9 +3,9 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "jaxrl2-vlac"
+name = "dreamer-v3"
 version = "1.0.0"
-description = "JAX RL2 with VLAC: Vision-Language-Action-Critic Model for Robotic Real-World Reinforcement Learning"
+description = "DreamerV3"
 readme = "README.md"
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -60,12 +60,6 @@ dependencies = [
     "etils==1.12.2",
     "loguru",
     "natsort",
-    # Openpi
-    "openpi-client",
-    "scikit-learn>=1.8.0",
-    "tyro>=1.0.8",
-    "augmax>=0.3.4",
-    "dm-tree>=0.1.8",
     # Dreamer-v3 baseline dependencies (vendored source requires these at runtime)
     "ninjax>=3.5.1",
     "elements>=3.19.1",

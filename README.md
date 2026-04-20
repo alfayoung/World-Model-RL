@@ -28,16 +28,35 @@ If you find this repository useful for your research, please cite:
 
 ## UV Installation
 
+Preferred:
+
 ```bash
-uv pip install -e .
+./bootstrap.sh
+source .venv/bin/activate
+```
+
+Equivalent manual steps:
+
+```bash
+# init submodules
+git submodule update --init --recursive
+
+uv sync
+source .venv/bin/activate
 
 # install openpi
-uv pip install -e openpi
-uv pip install -e openpi/packages/openpi-client
+uv pip install --python .venv/bin/python -e openpi
+uv pip install --python .venv/bin/python -e openpi/packages/openpi-client
 
 # install Libero
-uv pip install -e LIBERO
+uv pip install --python .venv/bin/python -e LIBERO
 ```
+
+Notes:
+
+- The submodules are required. On a fresh clone, `uv pip install -e openpi` and `uv pip install -e LIBERO` fail until `git submodule update --init --recursive` has completed.
+- If you already have another virtual environment active, bare `uv pip install ...` may target that environment instead of this repo's `.venv`. Using `--python .venv/bin/python` avoids that.
+- After the editable installs above, prefer running commands from the activated `.venv` (`python ...`, `bash ...`). `uv run` re-syncs the environment to `pyproject.toml` and `uv.lock`, and can remove manually installed packages that are not declared there, such as `LIBERO`.
 
 ## Conda Installation
 1. Create a conda environment:
@@ -46,10 +65,9 @@ conda create -n dsrl_pi0 python=3.11.11
 conda activate dsrl_pi0
 ```
 
-2. Clone this repo with all submodules
+2. Init with all submodules
 ```bash
-git clone git@github.com:nakamotoo/dsrl_pi0.git --recurse-submodules
-cd dsrl_pi0
+git submodule update --init --recursive
 ```
 
 3. Install all packages and dependencies
